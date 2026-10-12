@@ -1,0 +1,1322 @@
+[
+ {
+  "name": "Wooden mast and linen sails (Raft)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 1
+   },
+   {
+    "name": "Construction",
+    "level": 1
+   }
+  ],
+  "materials": [
+   {
+    "name": "Logs",
+    "quantity": 5
+   },
+   {
+    "name": "Bronze nails",
+    "quantity": 20
+   },
+   {
+    "name": "Bolt of linen",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Oak mast and linen sails (Raft)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 24
+   },
+   {
+    "name": "Construction",
+    "level": 11
+   }
+  ],
+  "materials": [
+   {
+    "name": "Oak logs",
+    "quantity": 5
+   },
+   {
+    "name": "Iron nails",
+    "quantity": 20
+   },
+   {
+    "name": "Bolt of linen",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Teak mast and canvas sails (Raft)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 36
+   },
+   {
+    "name": "Construction",
+    "level": 26
+   }
+  ],
+  "materials": [
+   {
+    "name": "Teak logs",
+    "quantity": 5
+   },
+   {
+    "name": "Steel nails",
+    "quantity": 20
+   },
+   {
+    "name": "Bolt of canvas",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Mahogany mast and canvas sails (Raft)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 52
+   },
+   {
+    "name": "Construction",
+    "level": 45
+   }
+  ],
+  "materials": [
+   {
+    "name": "Mahogany logs",
+    "quantity": 5
+   },
+   {
+    "name": "Mithril nails",
+    "quantity": 20
+   },
+   {
+    "name": "Bolt of canvas",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Camphor mast and canvas sails (Raft)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 68
+   },
+   {
+    "name": "Construction",
+    "level": 60
+   }
+  ],
+  "materials": [
+   {
+    "name": "Camphor logs",
+    "quantity": 5
+   },
+   {
+    "name": "Adamantite nails",
+    "quantity": 20
+   },
+   {
+    "name": "Bolt of canvas",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Ironwood mast and cotton sails (Raft)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 83
+   },
+   {
+    "name": "Construction",
+    "level": 77
+   }
+  ],
+  "materials": [
+   {
+    "name": "Ironwood logs",
+    "quantity": 5
+   },
+   {
+    "name": "Rune nails",
+    "quantity": 20
+   },
+   {
+    "name": "Bolt of cotton",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Rosewood mast and cotton sails (Raft)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 94
+   },
+   {
+    "name": "Construction",
+    "level": 85
+   }
+  ],
+  "materials": [
+   {
+    "name": "Rosewood logs",
+    "quantity": 5
+   },
+   {
+    "name": "Dragon nails",
+    "quantity": 20
+   },
+   {
+    "name": "Bolt of cotton",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Wooden mast and linen sails (Skiff)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 1
+   },
+   {
+    "name": "Construction",
+    "level": 1
+   }
+  ],
+  "materials": [
+   {
+    "name": "Logs",
+    "quantity": 10
+   },
+   {
+    "name": "Bronze nails",
+    "quantity": 40
+   },
+   {
+    "name": "Bolt of linen",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Oak mast and linen sails (Skiff)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 24
+   },
+   {
+    "name": "Construction",
+    "level": 11
+   }
+  ],
+  "materials": [
+   {
+    "name": "Oak logs",
+    "quantity": 10
+   },
+   {
+    "name": "Iron nails",
+    "quantity": 40
+   },
+   {
+    "name": "Bolt of linen",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Teak mast and canvas sails (Skiff)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 36
+   },
+   {
+    "name": "Construction",
+    "level": 26
+   }
+  ],
+  "materials": [
+   {
+    "name": "Teak logs",
+    "quantity": 10
+   },
+   {
+    "name": "Steel nails",
+    "quantity": 40
+   },
+   {
+    "name": "Bolt of canvas",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Mahogany mast and canvas sails (Skiff)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 52
+   },
+   {
+    "name": "Construction",
+    "level": 45
+   }
+  ],
+  "materials": [
+   {
+    "name": "Mahogany logs",
+    "quantity": 10
+   },
+   {
+    "name": "Mithril nails",
+    "quantity": 40
+   },
+   {
+    "name": "Bolt of canvas",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Camphor mast and canvas sails (Skiff)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 68
+   },
+   {
+    "name": "Construction",
+    "level": 60
+   }
+  ],
+  "materials": [
+   {
+    "name": "Camphor logs",
+    "quantity": 10
+   },
+   {
+    "name": "Adamantite nails",
+    "quantity": 40
+   },
+   {
+    "name": "Bolt of canvas",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Ironwood mast and cotton sails (Skiff)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 83
+   },
+   {
+    "name": "Construction",
+    "level": 77
+   }
+  ],
+  "materials": [
+   {
+    "name": "Ironwood logs",
+    "quantity": 10
+   },
+   {
+    "name": "Rune nails",
+    "quantity": 40
+   },
+   {
+    "name": "Bolt of cotton",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Rosewood mast and cotton sails (Skiff)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 94
+   },
+   {
+    "name": "Construction",
+    "level": 85
+   }
+  ],
+  "materials": [
+   {
+    "name": "Rosewood logs",
+    "quantity": 10
+   },
+   {
+    "name": "Dragon nails",
+    "quantity": 40
+   },
+   {
+    "name": "Bolt of cotton",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Wooden mast and linen sails (Sloop)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 50
+   },
+   {
+    "name": "Construction",
+    "level": 1
+   }
+  ],
+  "materials": [
+   {
+    "name": "Logs",
+    "quantity": 15
+   },
+   {
+    "name": "Bronze nails",
+    "quantity": 60
+   },
+   {
+    "name": "Bolt of linen",
+    "quantity": 10
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Oak mast and linen sails (Sloop)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 50
+   },
+   {
+    "name": "Construction",
+    "level": 11
+   }
+  ],
+  "materials": [
+   {
+    "name": "Oak logs",
+    "quantity": 15
+   },
+   {
+    "name": "Iron nails",
+    "quantity": 60
+   },
+   {
+    "name": "Bolt of linen",
+    "quantity": 10
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Teak mast and canvas sails (Sloop)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 50
+   },
+   {
+    "name": "Construction",
+    "level": 26
+   }
+  ],
+  "materials": [
+   {
+    "name": "Teak logs",
+    "quantity": 15
+   },
+   {
+    "name": "Steel nails",
+    "quantity": 60
+   },
+   {
+    "name": "Bolt of canvas",
+    "quantity": 10
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Mahogany mast and canvas sails (Sloop)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 52
+   },
+   {
+    "name": "Construction",
+    "level": 45
+   }
+  ],
+  "materials": [
+   {
+    "name": "Mahogany logs",
+    "quantity": 15
+   },
+   {
+    "name": "Mithril nails",
+    "quantity": 60
+   },
+   {
+    "name": "Bolt of canvas",
+    "quantity": 10
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Camphor mast and canvas sails (Sloop)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 68
+   },
+   {
+    "name": "Construction",
+    "level": 60
+   }
+  ],
+  "materials": [
+   {
+    "name": "Camphor logs",
+    "quantity": 15
+   },
+   {
+    "name": "Adamantite nails",
+    "quantity": 60
+   },
+   {
+    "name": "Bolt of canvas",
+    "quantity": 10
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Ironwood mast and cotton sails (Sloop)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 83
+   },
+   {
+    "name": "Construction",
+    "level": 77
+   }
+  ],
+  "materials": [
+   {
+    "name": "Ironwood logs",
+    "quantity": 15
+   },
+   {
+    "name": "Rune nails",
+    "quantity": 60
+   },
+   {
+    "name": "Bolt of cotton",
+    "quantity": 10
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Rosewood mast and cotton sails (Sloop)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 94
+   },
+   {
+    "name": "Construction",
+    "level": 85
+   }
+  ],
+  "materials": [
+   {
+    "name": "Rosewood logs",
+    "quantity": 15
+   },
+   {
+    "name": "Dragon nails",
+    "quantity": 60
+   },
+   {
+    "name": "Bolt of cotton",
+    "quantity": 10
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Wooden hull (Raft)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 1
+   },
+   {
+    "name": "Construction",
+    "level": 1
+   }
+  ],
+  "materials": [
+   {
+    "name": "Logs",
+    "quantity": 10
+   },
+   {
+    "name": "Rope",
+    "quantity": 6
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 10
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Wooden hull (Skiff)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 15
+   },
+   {
+    "name": "Construction",
+    "level": 1
+   }
+  ],
+  "materials": [
+   {
+    "name": "Wooden hull parts",
+    "quantity": 10
+   },
+   {
+    "name": "Bronze nails",
+    "quantity": 300
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 20
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Wooden hull (Sloop)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 50
+   },
+   {
+    "name": "Construction",
+    "level": 1
+   }
+  ],
+  "materials": [
+   {
+    "name": "Large wooden hull parts",
+    "quantity": 16
+   },
+   {
+    "name": "Bronze nails",
+    "quantity": 600
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 25
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Oak hull (Raft)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 20
+   },
+   {
+    "name": "Construction",
+    "level": 8
+   }
+  ],
+  "materials": [
+   {
+    "name": "Oak logs",
+    "quantity": 10
+   },
+   {
+    "name": "Rope",
+    "quantity": 6
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 10
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Oak hull (Skiff)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 20
+   },
+   {
+    "name": "Construction",
+    "level": 8
+   }
+  ],
+  "materials": [
+   {
+    "name": "Oak hull parts",
+    "quantity": 10
+   },
+   {
+    "name": "Iron nails",
+    "quantity": 300
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 20
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Oak hull (Sloop)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 50
+   },
+   {
+    "name": "Construction",
+    "level": 8
+   }
+  ],
+  "materials": [
+   {
+    "name": "Large oak hull parts",
+    "quantity": 16
+   },
+   {
+    "name": "Iron nails",
+    "quantity": 600
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 25
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Teak hull (Raft)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 31
+   },
+   {
+    "name": "Construction",
+    "level": 23
+   }
+  ],
+  "materials": [
+   {
+    "name": "Teak logs",
+    "quantity": 10
+   },
+   {
+    "name": "Rope",
+    "quantity": 6
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 10
+   },
+   {
+    "name": "Lead bar",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Teak hull (Skiff)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 31
+   },
+   {
+    "name": "Construction",
+    "level": 23
+   }
+  ],
+  "materials": [
+   {
+    "name": "Teak hull parts",
+    "quantity": 10
+   },
+   {
+    "name": "Steel nails",
+    "quantity": 300
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 20
+   },
+   {
+    "name": "Lead bar",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Teak hull (Sloop)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 50
+   },
+   {
+    "name": "Construction",
+    "level": 23
+   }
+  ],
+  "materials": [
+   {
+    "name": "Large teak hull parts",
+    "quantity": 16
+   },
+   {
+    "name": "Steel nails",
+    "quantity": 600
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 25
+   },
+   {
+    "name": "Lead bar",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Mahogany hull (Raft)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 48
+   },
+   {
+    "name": "Construction",
+    "level": 41
+   }
+  ],
+  "materials": [
+   {
+    "name": "Mahogany logs",
+    "quantity": 10
+   },
+   {
+    "name": "Rope",
+    "quantity": 6
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 10
+   },
+   {
+    "name": "Lead bar",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Mahogany hull (Skiff)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 48
+   },
+   {
+    "name": "Construction",
+    "level": 41
+   }
+  ],
+  "materials": [
+   {
+    "name": "Mahogany hull parts",
+    "quantity": 10
+   },
+   {
+    "name": "Mithril nails",
+    "quantity": 300
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 20
+   },
+   {
+    "name": "Lead bar",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Mahogany hull (Sloop)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 50
+   },
+   {
+    "name": "Construction",
+    "level": 41
+   }
+  ],
+  "materials": [
+   {
+    "name": "Large mahogany hull parts",
+    "quantity": 16
+   },
+   {
+    "name": "Mithril nails",
+    "quantity": 600
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 25
+   },
+   {
+    "name": "Lead bar",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Camphor hull (Raft)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 67
+   },
+   {
+    "name": "Construction",
+    "level": 59
+   }
+  ],
+  "materials": [
+   {
+    "name": "Camphor logs",
+    "quantity": 10
+   },
+   {
+    "name": "Rope",
+    "quantity": 6
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 10
+   },
+   {
+    "name": "Lead bar",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Camphor hull (Skiff)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 67
+   },
+   {
+    "name": "Construction",
+    "level": 59
+   }
+  ],
+  "materials": [
+   {
+    "name": "Camphor hull parts",
+    "quantity": 10
+   },
+   {
+    "name": "Adamantite nails",
+    "quantity": 300
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 20
+   },
+   {
+    "name": "Lead bar",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Camphor hull (Sloop)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 67
+   },
+   {
+    "name": "Construction",
+    "level": 59
+   }
+  ],
+  "materials": [
+   {
+    "name": "Large camphor hull parts",
+    "quantity": 16
+   },
+   {
+    "name": "Adamantite nails",
+    "quantity": 600
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 25
+   },
+   {
+    "name": "Lead bar",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Ironwood hull (Raft)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 81
+   },
+   {
+    "name": "Construction",
+    "level": 75
+   }
+  ],
+  "materials": [
+   {
+    "name": "Ironwood logs",
+    "quantity": 10
+   },
+   {
+    "name": "Rope",
+    "quantity": 6
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 10
+   },
+   {
+    "name": "Cupronickel bar",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Ironwood hull (Skiff)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 81
+   },
+   {
+    "name": "Construction",
+    "level": 75
+   }
+  ],
+  "materials": [
+   {
+    "name": "Ironwood hull parts",
+    "quantity": 10
+   },
+   {
+    "name": "Rune nails",
+    "quantity": 300
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 20
+   },
+   {
+    "name": "Cupronickel bar",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Ironwood hull (Sloop)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 81
+   },
+   {
+    "name": "Construction",
+    "level": 75
+   }
+  ],
+  "materials": [
+   {
+    "name": "Large ironwood hull parts",
+    "quantity": 16
+   },
+   {
+    "name": "Rune nails",
+    "quantity": 600
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 25
+   },
+   {
+    "name": "Cupronickel bar",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Rosewood hull (Raft)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 93
+   },
+   {
+    "name": "Construction",
+    "level": 84
+   }
+  ],
+  "materials": [
+   {
+    "name": "Rosewood logs",
+    "quantity": 10
+   },
+   {
+    "name": "Rope",
+    "quantity": 6
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 10
+   },
+   {
+    "name": "Cupronickel bar",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Rosewood hull (Skiff)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 93
+   },
+   {
+    "name": "Construction",
+    "level": 84
+   }
+  ],
+  "materials": [
+   {
+    "name": "Rosewood hull parts",
+    "quantity": 10
+   },
+   {
+    "name": "Dragon nails",
+    "quantity": 300
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 20
+   },
+   {
+    "name": "Cupronickel bar",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ },
+ {
+  "name": "Rosewood hull (Sloop)",
+  "outputQuantity": 1,
+  "skills": [
+   {
+    "name": "Sailing",
+    "level": 93
+   },
+   {
+    "name": "Construction",
+    "level": 84
+   }
+  ],
+  "materials": [
+   {
+    "name": "Large rosewood hull parts",
+    "quantity": 16
+   },
+   {
+    "name": "Dragon nails",
+    "quantity": 600
+   },
+   {
+    "name": "Swamp tar",
+    "quantity": 25
+   },
+   {
+    "name": "Cupronickel bar",
+    "quantity": 5
+   }
+  ],
+  "facility": "Shipyard (boat schematics)",
+  "members": true
+ }
+]
