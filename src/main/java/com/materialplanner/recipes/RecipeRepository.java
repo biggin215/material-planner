@@ -6,7 +6,6 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.reflect.TypeToken;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -15,7 +14,7 @@ import java.io.Writer;
 import java.lang.reflect.Type;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -24,7 +23,7 @@ import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
-import net.runelite.client.RuneLite;
+import net.runelite.client.util.Filepath;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -34,7 +33,7 @@ import okhttp3.ResponseBody;
  * Supplies every known recipe. Sources, merged in order:
  * <ol>
  *   <li>Built-in seed recipes bundled with the plugin (always available, curated).</li>
- *   <li>The OSRS Wiki recipe database, downloaded and cached in ~/.runelite/material-planner/.</li>
+ *   <li>The OSRS Wiki recipe database, downloaded and cached in the plugin's data directory.</li>
  * </ol>
  */
 @Slf4j
@@ -44,8 +43,7 @@ public class RecipeRepository
 	private static final String USER_AGENT = "RuneLite Material Planner plugin";
 	private static final int PAGE_SIZE = 500;
 	private static final int MAX_ROWS = 40_000;
-	private static final File CACHE_DIR = new File(RuneLite.RUNELITE_DIR, "material-planner");
-	private static final File CACHE_FILE = new File(CACHE_DIR, "recipes.json");
+	private static final String CACHE_NAME = "recipes.json";
 	private static final Type LIST_TYPE = new TypeToken<List<Recipe>>()
 	{
 	}.getType();
@@ -66,16 +64,22 @@ public class RecipeRepository
 
 	private final Gson gson;
 	private final OkHttpClient http;
+	/** Plugin data directory, or null when it couldn't be opened (the cache is then skipped). */
+	private final Filepath cacheDir;
 
 	private volatile List<Recipe> recipes = Collections.emptyList();
 	private volatile List<String> skills = Collections.emptyList();
 	private volatile Map<String, List<Recipe>> byOutput = Collections.emptyMap();
 	private volatile String status = "Loading recipes…";
 
-	public RecipeRepository(Gson gson, OkHttpClient http)
+	/**
+	 * @param cacheDir the plugin's data directory from {@code Plugin#getPluginDirectory()}, or null
+	 */
+	public RecipeRepository(Gson gson, OkHttpClient http, Filepath cacheDir)
 	{
 		this.gson = gson;
 		this.http = http;
+		this.cacheDir = cacheDir;
 	}
 
 	public List<Recipe> getRecipes()
@@ -118,7 +122,7 @@ public class RecipeRepository
 		{
 			List<Recipe> cached = readCache();
 			boolean stale = cached == null || forceRefresh
-				|| System.currentTimeMillis() - CACHE_FILE.lastModified() > TimeUnit.DAYS.toMillis(refreshDays);
+				|| System.currentTimeMillis() - cacheModified() > TimeUnit.DAYS.toMillis(refreshDays);
 
 			if (stale)
 			{
@@ -252,13 +256,32 @@ public class RecipeRepository
 		}
 	}
 
+	private Filepath cacheFile()
+	{
+		return cacheDir == null ? null : cacheDir.join(CACHE_NAME);
+	}
+
+	private long cacheModified()
+	{
+		Filepath f = cacheFile();
+		try
+		{
+			return f != null && f.exists() ? f.getLastModifiedTime().toMillis() : 0;
+		}
+		catch (IOException e)
+		{
+			return 0;
+		}
+	}
+
 	private List<Recipe> readCache()
 	{
-		if (!CACHE_FILE.exists())
+		Filepath f = cacheFile();
+		if (f == null || !f.exists())
 		{
 			return null;
 		}
-		try (Reader reader = Files.newBufferedReader(CACHE_FILE.toPath(), StandardCharsets.UTF_8))
+		try (Reader reader = f.openBufferedReader())
 		{
 			return gson.fromJson(reader, LIST_TYPE);
 		}
@@ -271,15 +294,21 @@ public class RecipeRepository
 
 	private void writeCache(List<Recipe> list)
 	{
+		Filepath f = cacheFile();
+		if (f == null)
+		{
+			return;
+		}
 		try
 		{
-			Files.createDirectories(CACHE_DIR.toPath());
-			File tmp = new File(CACHE_DIR, "recipes.json.tmp");
-			try (Writer w = Files.newBufferedWriter(tmp.toPath(), StandardCharsets.UTF_8))
+			cacheDir.createDirectories();
+			// Write to a temp file first so a crash mid-write can't leave a corrupt cache
+			Filepath tmp = cacheDir.join(CACHE_NAME + ".tmp");
+			try (Writer w = tmp.openBufferedWriter())
 			{
 				gson.toJson(list, LIST_TYPE, w);
 			}
-			Files.move(tmp.toPath(), CACHE_FILE.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+			tmp.moveTo(f, StandardCopyOption.REPLACE_EXISTING);
 		}
 		catch (IOException e)
 		{

@@ -35,7 +35,7 @@ View one storage at a time or all together, and search across them. Right-click 
 
 ## Where the recipes come from
 
-On first start the plugin downloads the OSRS Wiki's recipe database (the data behind the wiki's skill calculators) and caches it in `~/.runelite/material-planner/recipes.json`. It re-downloads every 7 days by default, or on demand with the ↻ button. Recipe data © OSRS Wiki contributors, CC BY-NC-SA 3.0.
+On first start the plugin downloads the OSRS Wiki's recipe database (the data behind the wiki's skill calculators) and caches it in the plugin's data folder (`~/.runelite/plugin-data/material-planner/`). It re-downloads every 7 days by default, or on demand with the ↻ button. Recipe data © OSRS Wiki contributors, CC BY-NC-SA 3.0.
 
 The plugin also ships built-in Sailing shipyard recipes (all hulls and mast-and-sails for raft, skiff and sloop), since those vary by boat type.
 

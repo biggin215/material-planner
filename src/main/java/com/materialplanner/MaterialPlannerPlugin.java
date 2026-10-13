@@ -10,6 +10,7 @@ import com.materialplanner.recipes.RecipeRepository;
 import com.materialplanner.ui.MaterialPlannerPanel;
 import com.materialplanner.ui.PanelHost;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -56,6 +57,7 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.Filepath;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.Text;
 import okhttp3.OkHttpClient;
@@ -64,6 +66,8 @@ import okhttp3.OkHttpClient;
 @PluginDescriptor(
 	name = "Material Planner",
 	description = "Remembers your bank and other storage, and plans the materials for any recipe",
+	internalName = "material-planner",
+	legacyDataDirectory = "material-planner",
 	tags = {"bank", "memory", "recipe", "materials", "shopping", "skilling", "sailing", "storage"}
 )
 public class MaterialPlannerPlugin extends Plugin implements PanelHost
@@ -159,7 +163,16 @@ public class MaterialPlannerPlugin extends Plugin implements PanelHost
 	protected void startUp()
 	{
 		store = new ItemStore(configManager, gson);
-		recipes = new RecipeRepository(gson, okHttpClient);
+		Filepath dataDir = null;
+		try
+		{
+			dataDir = getPluginDirectory();
+		}
+		catch (IOException | RuntimeException e)
+		{
+			log.warn("Plugin data directory unavailable; recipes won't be cached", e);
+		}
+		recipes = new RecipeRepository(gson, okHttpClient, dataDir);
 		panel = new MaterialPlannerPanel(itemManager, store, recipes, configManager, gson, config, this,
 			() -> loadRecipes(true));
 
