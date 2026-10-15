@@ -2,6 +2,14 @@
 
 Plan what you need for anything you can make in OSRS, counting what you already own across your bank and other storage.
 
+<p>
+  <img src="docs/recipes.png" alt="Recipes tab planning a mahogany sloop hull, expanded down to logs, nails and coins" height="560">
+  <img src="docs/method-menu.png" alt="Right-click menu for choosing how mahogany planks are made" height="560">
+  <img src="docs/storage.png" alt="Storage tab with the storage location dropdown open" height="560">
+</p>
+
+*Left: one sloop hull planned down to raw materials. Middle: right-click any ingredient to choose how it's made. Right: everything you own across your bank, seed vault, cargo holds and other storage.*
+
 ## Recipes tab
 
 - Type in the search box for a live dropdown, or choose a skill to browse everything in that skill.
