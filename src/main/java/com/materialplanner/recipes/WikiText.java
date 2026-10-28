@@ -124,4 +124,10 @@ public final class WikiText
 		parts.add(cur.toString());
 		return parts;
 	}
+
+	/** Escapes text for a single-quoted Lua string in a bucket query. */
+	public static String lua(String s)
+	{
+		return s.replace("\\", "\\\\").replace("'", "\\'");
+	}
 }

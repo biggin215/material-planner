@@ -36,10 +36,12 @@ import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
+import net.runelite.api.Player;
 import net.runelite.api.Quest;
 import net.runelite.api.QuestState;
 import net.runelite.api.WorldType;
 import net.runelite.api.Skill;
+import net.runelite.api.coords.WorldPoint;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
 import net.runelite.api.events.ItemContainerChanged;
@@ -239,6 +241,8 @@ public class MaterialPlannerPlugin extends Plugin implements PanelHost
 		unmetQuestCache.clear();
 		membersWorld = null;
 		ironman = false;
+		playerLocation = null;
+		lastRefreshLocation = null;
 	}
 
 	/**
@@ -463,6 +467,49 @@ public class MaterialPlannerPlugin extends Plugin implements PanelHost
 			refreshPanelSettings();
 		}
 		readCargoHold();
+		trackLocation();
+	}
+
+	/** Tiles the player must move before shop "nearest" picks are worked out again. */
+	private static final int LOCATION_REFRESH_TILES = 100;
+	private volatile int[] playerLocation;
+	private int[] lastRefreshLocation;
+
+	/**
+	 * Client thread. Keeps a copy of where the player is, and refreshes the panel after a long move
+	 * (a teleport, usually) so the nearest shop follows them.
+	 */
+	private void trackLocation()
+	{
+		Player me = client.getLocalPlayer();
+		if (me == null)
+		{
+			return;
+		}
+		WorldPoint wp = WorldPoint.fromLocalInstance(client, me.getLocalLocation());
+		if (wp == null)
+		{
+			return;
+		}
+		int[] here = {wp.getX(), wp.getY(), wp.getPlane()};
+		playerLocation = here;
+		if (lastRefreshLocation == null)
+		{
+			lastRefreshLocation = here;
+			return;
+		}
+		int moved = Math.max(Math.abs(here[0] - lastRefreshLocation[0]), Math.abs(here[1] - lastRefreshLocation[1]));
+		if (moved >= LOCATION_REFRESH_TILES)
+		{
+			lastRefreshLocation = here;
+			refreshPanelSettings();
+		}
+	}
+
+	@Override
+	public int[] playerLocation()
+	{
+		return playerLocation;
 	}
 
 	/**

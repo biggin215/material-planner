@@ -11,6 +11,7 @@ import com.materialplanner.items.Location;
 import com.materialplanner.recipes.Planner;
 import com.materialplanner.recipes.Recipe;
 import com.materialplanner.recipes.RecipeRepository;
+import com.materialplanner.recipes.ShopAccess;
 import com.materialplanner.recipes.ShopSource;
 import com.materialplanner.recipes.Xp;
 import java.awt.BorderLayout;
@@ -106,6 +107,33 @@ class RecipeTab extends JPanel
 	private final MaterialPlannerConfig config;
 	private final IconCache icons;
 	private final PanelHost host;
+	/** The player as the shop access rules see them. */
+	private final ShopAccess.Player shopPlayer = new ShopAccess.Player()
+	{
+		@Override
+		public Boolean membersWorld()
+		{
+			return host.membersWorld();
+		}
+
+		@Override
+		public List<String> unmetQuests(String requirementText)
+		{
+			return host.unmetQuests(requirementText);
+		}
+
+		@Override
+		public int realLevel(String skill)
+		{
+			return host.realLevel(skill);
+		}
+
+		@Override
+		public int[] location()
+		{
+			return host.playerLocation();
+		}
+	};
 
 	private final Kit.TextBlock statusText = new Kit.TextBlock(WIDTH_HINT - 30);
 	private final Kit.Dropdown<String> skillBox = new Kit.Dropdown<>();
@@ -887,11 +915,18 @@ class RecipeTab extends JPanel
 		}
 		if (n.shortBy > 0 && n.via == null)
 		{
-			List<ShopSource> shops = recipes.getShops(n.name);
-			if (!shops.isEmpty())
+			ShopAccess.Pick pick = ShopAccess.pick(recipes.getShops(n.name), shopPlayer);
+			if (pick.cheapest != null)
 			{
-				row.detail("Shop: " + shopText(shops.get(0)) + (shops.size() > 1 ? " (+" + (shops.size() - 1) + " more)" : ""),
-					Theme.MUTED, 2);
+				row.detail("Shop: " + shopText(pick.cheapest), Theme.MUTED, 3);
+				if (pick.nearest != null)
+				{
+					row.detail("Nearest: " + shopText(pick.nearest), Theme.MUTED, 3);
+				}
+			}
+			else if (!pick.locked.isEmpty())
+			{
+				row.detail("Shops: none you can use yet", Theme.FAINT, 1);
 			}
 		}
 
@@ -932,10 +967,28 @@ class RecipeTab extends JPanel
 		List<ShopSource> shops = n.shortBy > 0 ? recipes.getShops(n.name) : java.util.Collections.emptyList();
 		if (!shops.isEmpty())
 		{
+			int[] here = host.playerLocation();
+			int shown = 0;
 			sb.append("<br>Sold by:<br>");
-			for (int i = 0; i < Math.min(5, shops.size()); i++)
+			for (ShopSource s : shops)
 			{
-				sb.append("&nbsp;&nbsp;").append(Theme.escape(shopText(shops.get(i)))).append("<br>");
+				if (shown == 6)
+				{
+					break;
+				}
+				List<String> why = ShopAccess.blockers(s, shopPlayer);
+				int d = ShopAccess.distance(s, here);
+				sb.append("&nbsp;&nbsp;").append(Theme.escape(shopText(s)));
+				if (!why.isEmpty())
+				{
+					sb.append(" <font color='#e07b6a'>needs ").append(Theme.escape(String.join(", ", why))).append("</font>");
+				}
+				else if (d >= 0)
+				{
+					sb.append(" <font color='#9a9a9a'>~").append(Theme.n(d)).append(" tiles</font>");
+				}
+				sb.append("<br>");
+				shown++;
 			}
 		}
 		if (!n.alternatives.isEmpty())

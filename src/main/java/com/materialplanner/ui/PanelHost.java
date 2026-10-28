@@ -38,6 +38,11 @@ public interface PanelHost
 	/**
 	 * Cost mode with AUTO already resolved for the current account. Never returns AUTO.
 	 */
+	/**
+	 * Where the player is as {x, y, plane}, or null when not logged in.
+	 */
+	int[] playerLocation();
+
 	CostMode effectiveCostMode();
 
 	/**

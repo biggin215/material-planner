@@ -13,6 +13,11 @@ public class ShopSource
 	public String currency;
 	/** Base stock as listed on the wiki, e.g. "10" or "∞"; may be null. */
 	public String stock;
+	/** Wiki location text, e.g. "Prifddinas, Tirannwn"; may be null. */
+	public String location;
+	public boolean members;
+	/** Known spots for the shop or its owner as {x, y, plane}; may be null or empty. */
+	public java.util.List<int[]> coords;
 
 	public boolean isCoins()
 	{

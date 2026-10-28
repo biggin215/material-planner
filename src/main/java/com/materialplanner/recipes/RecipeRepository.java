@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
@@ -45,7 +46,7 @@ public class RecipeRepository
 	private static final int MAX_ROWS = 40_000;
 	// v2: adds XP, cleaned tools/facilities, quest text and the real members flag
 	private static final String CACHE_NAME = "recipes-v2.json";
-	private static final String SHOP_CACHE_NAME = "shops-v1.json";
+	private static final String SHOP_CACHE_NAME = "shops-v2.json";
 	private static final int MAX_SHOP_ROWS = 60_000;
 	private static final Type SHOP_LIST_TYPE = new TypeToken<List<ShopSource>>()
 	{
@@ -452,7 +453,146 @@ public class RecipeRepository
 				break;
 			}
 		}
+		try
+		{
+			addShopLocations(out);
+		}
+		catch (IOException | RuntimeException e)
+		{
+			// Prices still work without locations; access checks and "nearest" just stay off
+			log.warn("Wiki shop location download failed", e);
+		}
 		return out;
+	}
+
+	private static final int LOCLINE_BATCH = 40;
+
+	/**
+	 * Adds where each shop is (infobox_shop) and its map spots (locline, for the shop page or its owner).
+	 */
+	private void addShopLocations(List<ShopSource> shops) throws IOException
+	{
+		Map<String, String[]> info = new java.util.HashMap<>();
+		for (int offset = 0; offset < MAX_SHOP_ROWS; offset += PAGE_SIZE)
+		{
+			JsonArray rows = queryBucket("bucket('infobox_shop').select('page_name','location','owner','is_members_only')"
+				+ ".limit(" + PAGE_SIZE + ").offset(" + offset + ").run()");
+			for (JsonElement row : rows)
+			{
+				if (!row.isJsonObject())
+				{
+					continue;
+				}
+				JsonObject ro = row.getAsJsonObject();
+				String page = WikiText.clean(text(ro.get("page_name")));
+				if (page == null || page.isEmpty())
+				{
+					continue;
+				}
+				info.putIfAbsent(Planner.normalize(page), new String[]{
+					WikiText.clean(text(ro.get("location"))),
+					WikiText.clean(text(ro.get("owner"))),
+					String.valueOf(WikiRecipeParser.parseMembers(ro.get("is_members_only")))});
+			}
+			if (rows.size() < PAGE_SIZE)
+			{
+				break;
+			}
+		}
+
+		// Map spots for every shop page and owner we'll need
+		Set<String> names = new java.util.TreeSet<>();
+		for (ShopSource s : shops)
+		{
+			names.add(s.store);
+			String[] i = info.get(Planner.normalize(s.store));
+			if (i != null && i[1] != null && !i[1].isEmpty())
+			{
+				names.add(i[1]);
+			}
+		}
+		Map<String, List<int[]>> spots = new java.util.HashMap<>();
+		List<String> batch = new ArrayList<>();
+		for (String n : names)
+		{
+			batch.add(n);
+			if (batch.size() == LOCLINE_BATCH)
+			{
+				fetchSpots(batch, spots);
+				batch.clear();
+			}
+		}
+		if (!batch.isEmpty())
+		{
+			fetchSpots(batch, spots);
+		}
+
+		for (ShopSource s : shops)
+		{
+			String[] i = info.get(Planner.normalize(s.store));
+			if (i != null)
+			{
+				s.location = i[0];
+				s.members = Boolean.parseBoolean(i[2]);
+			}
+			List<int[]> c = spots.get(Planner.normalize(s.store));
+			if ((c == null || c.isEmpty()) && i != null && i[1] != null)
+			{
+				c = spots.get(Planner.normalize(i[1]));
+			}
+			s.coords = c;
+		}
+	}
+
+	private void fetchSpots(List<String> pages, Map<String, List<int[]>> into) throws IOException
+	{
+		StringBuilder where = new StringBuilder();
+		for (String p : pages)
+		{
+			if (where.length() > 0)
+			{
+				where.append(',');
+			}
+			where.append("{'page_name','").append(WikiText.lua(p)).append("'}");
+		}
+		String filter = pages.size() == 1 ? where.toString() : "bucket.Or(" + where + ")";
+		JsonArray rows = queryBucket("bucket('locline').select('page_name','coordinates','plane')"
+			+ ".where(" + filter + ").limit(" + PAGE_SIZE + ").run()");
+		for (JsonElement row : rows)
+		{
+			if (!row.isJsonObject())
+			{
+				continue;
+			}
+			JsonObject ro = row.getAsJsonObject();
+			String page = text(ro.get("page_name"));
+			if (page == null)
+			{
+				continue;
+			}
+			int plane = WikiRecipeParser.num(ro.get("plane"), 0);
+			JsonElement coords = ro.get("coordinates");
+			List<String> parts = new ArrayList<>();
+			if (coords != null && coords.isJsonArray())
+			{
+				for (JsonElement e : coords.getAsJsonArray())
+				{
+					parts.add(e.isJsonPrimitive() ? e.getAsString() : e.toString());
+				}
+			}
+			else if (coords != null && !coords.isJsonNull())
+			{
+				parts.add(coords.isJsonPrimitive() ? coords.getAsString() : coords.toString());
+			}
+			for (String part : parts)
+			{
+				for (int[] c : ShopAccess.parseCoordinates(part))
+				{
+					c[2] = plane;
+					into.computeIfAbsent(Planner.normalize(page), k -> new ArrayList<>()).add(c);
+				}
+			}
+		}
 	}
 
 	private static String text(JsonElement e)

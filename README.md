@@ -24,7 +24,7 @@ Plan what you need for anything you can make in OSRS, counting what you already 
 - **Access checks** flag recipes and crafting steps your levels are too low for, members-only recipes on a free world, and recipes behind a quest you haven't done. Optionally hide those recipes from search.
 - **Tools** the plan needs (saw, hammer, chisel and so on) get their own list showing whether each is on you, in the bank, or missing.
 - **Trip count**: the overview shows roughly how many inventories of materials the plan takes to carry. Stackable items count as one slot.
-- **Shops**: anything you're short that a shop sells shows the cheapest coin shop and price, so ironmen know where to buy it.
+- **Shops**: anything you're short that a shop sells shows the cheapest coin shop you can actually use, plus the nearest one when that's a different shop. Shops behind a quest you haven't done (Prifddinas, Keldagrim, Zanaris...), a guild level you don't have, or members-only shops on a free world are left out, and the tooltip says what each one needs.
 - **Costs**: coins the plan needs (sawmill fees and similar) plus, optionally, the GE price of everything you're short. "Auto" shows coins only on ironman accounts.
 - **Bank highlighting**: items the plan needs from the bank are outlined when you open it.
 
@@ -84,4 +84,5 @@ Requires JDK 11+.
 - When the wiki lists three same-named Sailing recipes, they're labelled Raft/Skiff/Sloop by material count. That's inferred, not read from the data.
 - XP per action and quest requirements come from the wiki's recipe data. Recipes without XP data can only be planned by count, and quest names that don't match RuneLite's quest list aren't checked.
 - Shop prices are base prices; most shops charge more as their stock runs down.
+- "Nearest" is straight-line distance on the map, not walking or teleport time. Which areas need which quest is a hand-kept list, so a gated area that isn't on it is treated as open.
 - POH costume room storage isn't tracked.
