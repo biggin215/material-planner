@@ -13,7 +13,7 @@ Plan what you need for anything you can make in OSRS, counting what you already 
 ## Recipes tab
 
 - Type in the search box for a live dropdown, or choose a skill to browse everything in that skill.
-- Click a recipe to add it. Plan it by **count** (how many times you'll make it) or by **level goal**: pick a target level and the plugin works out how many actions get you there from your current XP. Add as many recipes as you like; materials are combined.
+- Click a recipe to add it. Plan it by **count** (how many times you'll make it) or by **level goal**: pick a target level and the plugin works out how many actions get you there. Level goals chain: by default each step starts where the step above it (same skill) ends, so you can plan potion A from 50 to 53, potion B from 53 to 56 and so on. Switch a step's start from **Auto** to **Set** to choose its starting level yourself. A step whose level requirement is reached by an earlier step isn't flagged as too high. Add as many recipes as you like; materials are combined.
 - **Sub-recipes are planned automatically.** If you're missing an ingredient that can be crafted, the plugin plans its ingredients too, all the way down to raw materials. Stock you already have is used first at every level, and is shared across the whole plan so nothing is counted twice.
 - **Choose how things are made.** By default the plugin picks a method you can actually do with what you own (it won't send you to a sawmill coupon you don't have). Right-click any material to pick a different method, for example sawmill vs. Plank Make, or to say you'll gather or buy it instead. Your choices are remembered.
 - Each material is color-coded:

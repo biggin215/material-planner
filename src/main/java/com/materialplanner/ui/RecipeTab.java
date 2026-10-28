@@ -77,12 +77,15 @@ class RecipeTab extends JPanel
 		int quantity;
 		/** 0 when planning by count; otherwise the target level for the recipe's skill. */
 		int targetLevel;
+		/** Level the step starts from; 0 means automatic (where the step above ends, or your current XP). */
+		int startLevel;
 
-		SavedSelection(String key, int quantity, int targetLevel)
+		SavedSelection(String key, int quantity, int targetLevel, int startLevel)
 		{
 			this.key = key;
 			this.quantity = quantity;
 			this.targetLevel = targetLevel;
+			this.startLevel = startLevel;
 		}
 	}
 
@@ -91,12 +94,14 @@ class RecipeTab extends JPanel
 		final Recipe recipe;
 		int quantity;
 		int targetLevel;
+		int startLevel;
 
-		Selection(Recipe recipe, int quantity, int targetLevel)
+		Selection(Recipe recipe, int quantity, int targetLevel, int startLevel)
 		{
 			this.recipe = recipe;
 			this.quantity = quantity;
 			this.targetLevel = targetLevel;
+			this.startLevel = startLevel;
 		}
 	}
 
@@ -329,7 +334,7 @@ class RecipeTab extends JPanel
 			}
 			else if (selections.stream().noneMatch(x -> x.recipe.equals(r)))
 			{
-				selections.add(new Selection(r, Math.max(1, s.quantity), Math.max(0, s.targetLevel)));
+				selections.add(new Selection(r, Math.max(1, s.quantity), Math.max(0, s.targetLevel), Math.max(0, s.startLevel)));
 			}
 		}
 		pendingRestore = stillMissing.isEmpty() ? null : stillMissing;
@@ -421,7 +426,7 @@ class RecipeTab extends JPanel
 				return;
 			}
 		}
-		selections.add(new Selection(recipe, 1, 0));
+		selections.add(new Selection(recipe, 1, 0, 0));
 		search.setText("");
 		afterSelectionChange();
 	}
@@ -441,12 +446,25 @@ class RecipeTab extends JPanel
 	 */
 	List<String> blockers(Recipe r)
 	{
+		return blockers(r, null, 0);
+	}
+
+	/**
+	 * As above, but treating {@code plannedSkill} as being at {@code plannedLevel} when that's higher than
+	 * the real level (a level-goal step that starts where an earlier step ends).
+	 */
+	private List<String> blockers(Recipe r, String plannedSkill, int plannedLevel)
+	{
 		List<String> out = new ArrayList<>();
 		if (config.levelCheck())
 		{
 			for (Recipe.SkillReq s : r.skills)
 			{
 				int have = host.realLevel(s.name);
+				if (plannedSkill != null && plannedSkill.equalsIgnoreCase(s.name) && have >= 0)
+				{
+					have = Math.max(have, plannedLevel);
+				}
 				if (have >= 0 && s.level > have)
 				{
 					out.add(s.name + " " + s.level + " (you " + have + ")");
@@ -479,12 +497,61 @@ class RecipeTab extends JPanel
 			// No XP data (e.g. after a data refresh): fall back to the count
 			return s.quantity;
 		}
-		long xp = host.skillXp(skill.name);
+		long xp = startXp(s);
 		if (xp < 0)
 		{
 			return 0;
 		}
 		return Xp.actionsToLevel(xp, s.targetLevel, skill.experience);
+	}
+
+	/**
+	 * The level-goal step above this one for the same skill, if any.
+	 */
+	private Selection previousStep(Selection s)
+	{
+		Recipe.SkillReq skill = s.recipe.xpSkill();
+		Selection prev = null;
+		for (Selection x : selections)
+		{
+			if (x == s)
+			{
+				return prev;
+			}
+			Recipe.SkillReq xs = x.recipe.xpSkill();
+			if (x.targetLevel > 0 && xs != null && skill != null && xs.name.equalsIgnoreCase(skill.name))
+			{
+				prev = x;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * XP a level-goal step starts from: a level you set, else where the step above ends, else your current XP.
+	 * -1 when your XP isn't known yet.
+	 */
+	private long startXp(Selection s)
+	{
+		Recipe.SkillReq skill = s.recipe.xpSkill();
+		long cur = skill == null ? -1 : host.skillXp(skill.name);
+		if (cur < 0)
+		{
+			return -1;
+		}
+		if (s.startLevel > 0)
+		{
+			// Starting at your current level means starting from your actual XP, not the level's first point
+			return Xp.levelFor(cur) == s.startLevel ? cur : Xp.forLevel(s.startLevel);
+		}
+		Selection prev = previousStep(s);
+		return prev == null ? cur : Math.max(cur, Xp.forLevel(prev.targetLevel));
+	}
+
+	private int startLevel(Selection s)
+	{
+		long xp = startXp(s);
+		return xp < 0 ? 0 : Xp.levelFor(xp);
 	}
 
 	// =================================================================================================
@@ -551,7 +618,10 @@ class RecipeTab extends JPanel
 	private JComponent makingCard(Selection s)
 	{
 		Kit.Card card = new Kit.Card(new BorderLayout(0, 6));
-		List<String> blocked = blockers(s.recipe);
+		Recipe.SkillReq xpSkill = s.recipe.xpSkill();
+		boolean levelMode = s.targetLevel > 0 && xpSkill != null;
+		List<String> blocked = levelMode ? blockers(s.recipe, xpSkill.name, startLevel(s)) : blockers(s.recipe);
+		boolean reachedByPlan = levelMode && blocked.size() < blockers(s.recipe).size();
 		if (!blocked.isEmpty())
 		{
 			card.accent(Theme.BAD);
@@ -565,9 +635,14 @@ class RecipeTab extends JPanel
 		top.add(slot, BorderLayout.WEST);
 
 		String sub = blocked.isEmpty() ? s.recipe.subtitle() : "Needs " + String.join(", ", blocked);
-		Kit.TextBlock text = new Kit.TextBlock(WIDTH_HINT - 90).lines(
-			new Kit.Line(s.recipe.toString(), Theme.small(), Theme.TEXT, 2),
-			new Kit.Line(sub, Theme.small(), blocked.isEmpty() ? Theme.MUTED : Theme.BAD, 2));
+		List<Kit.Line> lines = new ArrayList<>();
+		lines.add(new Kit.Line(s.recipe.toString(), Theme.small(), Theme.TEXT, 2));
+		lines.add(new Kit.Line(sub, Theme.small(), blocked.isEmpty() ? Theme.MUTED : Theme.BAD, 2));
+		if (reachedByPlan && blocked.isEmpty())
+		{
+			lines.add(new Kit.Line("Level reached by an earlier step", Theme.small(), Theme.MAKE, 2));
+		}
+		Kit.TextBlock text = new Kit.TextBlock(WIDTH_HINT - 90).lines(lines.toArray(new Kit.Line[0]));
 		if (s.recipe.tools != null)
 		{
 			text.setToolTipText("Tools: " + s.recipe.tools);
@@ -587,7 +662,6 @@ class RecipeTab extends JPanel
 		card.add(top, BorderLayout.NORTH);
 
 		// Bottom: Count / Level mode and the number
-		Recipe.SkillReq xpSkill = s.recipe.xpSkill();
 		JPanel controls = new JPanel(new GridLayout(1, 2, 6, 0));
 		controls.setOpaque(false);
 		Kit.Segmented mode = new Kit.Segmented(false, "Count", "Level");
@@ -618,12 +692,13 @@ class RecipeTab extends JPanel
 			}
 			if (i == 1)
 			{
-				int cur = Math.max(1, host.realLevel(xpSkill.name));
-				s.targetLevel = Math.min(Xp.MAX_LEVEL, cur + 1);
+				s.startLevel = 0;
+				s.targetLevel = Math.min(Xp.MAX_LEVEL, Math.max(1, startLevel(s)) + 1);
 			}
 			else
 			{
 				s.targetLevel = 0;
+				s.startLevel = 0;
 			}
 			saveSelection();
 			rebuild();
@@ -633,7 +708,18 @@ class RecipeTab extends JPanel
 
 		JPanel bottom = new JPanel(new BorderLayout(0, 4));
 		bottom.setOpaque(false);
-		bottom.add(controls, BorderLayout.NORTH);
+		if (levelMode)
+		{
+			JPanel both = new JPanel(new GridLayout(2, 1, 0, 6));
+			both.setOpaque(false);
+			both.add(controls);
+			both.add(startControls(s, xpSkill));
+			bottom.add(both, BorderLayout.NORTH);
+		}
+		else
+		{
+			bottom.add(controls, BorderLayout.NORTH);
+		}
 		String goal = goalText(s, xpSkill);
 		if (goal != null)
 		{
@@ -643,12 +729,54 @@ class RecipeTab extends JPanel
 		return card;
 	}
 
+	/**
+	 * Second row in level mode: Auto / Set and the starting level.
+	 */
+	private JComponent startControls(Selection s, Recipe.SkillReq xpSkill)
+	{
+		JPanel row = new JPanel(new GridLayout(1, 2, 6, 0));
+		row.setOpaque(false);
+		Kit.Segmented how = new Kit.Segmented(false, "Auto", "Set");
+		how.setSelectedQuietly(s.startLevel > 0 ? 1 : 0);
+		Selection prev = previousStep(s);
+		how.setToolTipText(prev != null
+			? "Auto starts where " + prev.recipe.name + " ends, or at your current level if you're past it"
+			: "Auto starts at your current " + xpSkill.name + " level");
+		int from = Math.max(1, startLevel(s));
+		Kit.Stepper start = new Kit.Stepper(from, 1, Xp.MAX_LEVEL - 1).prefix("From ");
+		start.setToolTipText("Starting " + xpSkill.name + " level for this step");
+		start.onChange(v ->
+		{
+			s.startLevel = v;
+			if (s.targetLevel <= v)
+			{
+				s.targetLevel = Math.min(Xp.MAX_LEVEL, v + 1);
+			}
+			saveSelection();
+			rebuild();
+		});
+		how.onChange(i ->
+		{
+			s.startLevel = i == 1 ? Math.max(1, startLevel(s)) : 0;
+			int f = Math.max(1, startLevel(s));
+			if (s.targetLevel <= f)
+			{
+				s.targetLevel = Math.min(Xp.MAX_LEVEL, f + 1);
+			}
+			saveSelection();
+			rebuild();
+		});
+		row.add(how);
+		row.add(start);
+		return row;
+	}
+
 	private void configureStepper(Kit.Stepper stepper, Selection s, Recipe.SkillReq xpSkill)
 	{
 		if (s.targetLevel > 0 && xpSkill != null)
 		{
-			int cur = Math.max(1, host.realLevel(xpSkill.name));
-			stepper.range(Math.min(Xp.MAX_LEVEL, cur + 1), Xp.MAX_LEVEL).prefix("Lv ");
+			int from = Math.max(1, startLevel(s));
+			stepper.range(Math.min(Xp.MAX_LEVEL, from + 1), Xp.MAX_LEVEL).prefix("To ");
 			stepper.setQuietly(s.targetLevel);
 		}
 		else
@@ -664,18 +792,20 @@ class RecipeTab extends JPanel
 		{
 			return null;
 		}
-		long xp = host.skillXp(xpSkill.name);
+		long xp = startXp(s);
 		if (xp < 0)
 		{
 			return "Log in to plan by level";
 		}
 		int actions = effectiveQuantity(s);
+		int from = Xp.levelFor(xp);
 		if (actions == 0)
 		{
-			return "Already " + xpSkill.name + " " + Xp.levelFor(xp);
+			return "Already " + xpSkill.name + " " + from;
 		}
 		long needed = Xp.forLevel(s.targetLevel) - xp;
-		return Theme.n(actions) + " actions to " + xpSkill.name + " " + s.targetLevel + " (" + Theme.gp(needed) + " xp)";
+		return Theme.n(actions) + " actions, " + xpSkill.name + " " + from + " to " + s.targetLevel
+			+ " (" + Theme.gp(needed) + " xp)";
 	}
 
 	// =================================================================================================
@@ -1140,7 +1270,7 @@ class RecipeTab extends JPanel
 		List<SavedSelection> out = new ArrayList<>();
 		for (Selection s : selections)
 		{
-			out.add(new SavedSelection(s.recipe.key(), s.quantity, s.targetLevel));
+			out.add(new SavedSelection(s.recipe.key(), s.quantity, s.targetLevel, s.startLevel));
 		}
 		if (pendingRestore != null)
 		{
