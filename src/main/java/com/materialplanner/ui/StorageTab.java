@@ -61,7 +61,7 @@ class StorageTab extends JPanel
 	private final JLabel header = new JLabel();
 	private final JComboBox<Object> locationBox = new JComboBox<>();
 	private final IconTextField searchField = new IconTextField();
-	private final JList<Row> list = new JList<>(new DefaultListModel<>());
+	private final JList<Row> list = new ViewportList<>(new DefaultListModel<>());
 	private String shownSignature;
 
 	StorageTab(ItemStore store, IconCache icons)

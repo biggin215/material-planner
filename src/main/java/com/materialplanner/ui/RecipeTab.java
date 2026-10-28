@@ -124,7 +124,7 @@ class RecipeTab extends JPanel
 	private final JComboBox<String> skillBox = new JComboBox<>();
 	private final IconTextField searchField = new IconTextField();
 	private DefaultListModel<Recipe> suggestionModel = new DefaultListModel<>();
-	private final JList<Recipe> suggestionList = new JList<>(suggestionModel);
+	private final JList<Recipe> suggestionList = new ViewportList<>(suggestionModel);
 	private final Timer searchTimer = new Timer(SEARCH_DELAY_MS, e -> updateSuggestions());
 	private final JScrollPane suggestionScroll;
 	private final JPanel selectedPanel = new JPanel();
