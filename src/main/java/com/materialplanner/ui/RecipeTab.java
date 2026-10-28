@@ -11,18 +11,22 @@ import com.materialplanner.items.Location;
 import com.materialplanner.recipes.Planner;
 import com.materialplanner.recipes.Recipe;
 import com.materialplanner.recipes.RecipeRepository;
+import com.materialplanner.recipes.ShopSource;
+import com.materialplanner.recipes.Xp;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
-import java.awt.Cursor;
 import java.awt.Dimension;
-import java.awt.FlowLayout;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.GridLayout;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.awt.geom.RoundRectangle2D;
 import java.lang.reflect.Type;
-import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,51 +35,31 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
-import javax.swing.ButtonGroup;
 import javax.swing.DefaultListModel;
-import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JComponent;
-import javax.swing.JLabel;
 import javax.swing.JList;
-import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
-import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JScrollPane;
-import javax.swing.JSpinner;
 import javax.swing.ListCellRenderer;
 import javax.swing.ListSelectionModel;
-import javax.swing.ScrollPaneConstants;
-import javax.swing.Scrollable;
-import javax.swing.SpinnerNumberModel;
-import javax.swing.SwingConstants;
 import javax.swing.Timer;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import net.runelite.client.config.ConfigManager;
-import net.runelite.client.ui.ColorScheme;
-import net.runelite.client.ui.FontManager;
-import net.runelite.client.ui.PluginPanel;
-import net.runelite.client.ui.components.IconTextField;
 
 class RecipeTab extends JPanel
 {
 	private static final String ALL_SKILLS = "All skills";
 	private static final String KEY_SELECTION = "selection";
 	private static final String KEY_METHODS = "methods";
-	// Enough to browse most of a skill from the dropdown; rows are fixed-height so this stays cheap
 	private static final int MAX_SUGGESTIONS = 300;
 	private static final int SEARCH_DELAY_MS = 150;
-	private static final int TEXT_WIDTH = PluginPanel.PANEL_WIDTH - 60;
-	// Name column in a Making row; leaves room for the quantity box and the remove control
-	private static final int ROW_TEXT_WIDTH = PluginPanel.PANEL_WIDTH - 115;
-	private static final int INDENT = 10;
+	private static final int SUGGESTION_ROW = 36;
 	private static final Type SELECTION_TYPE = new TypeToken<List<SavedSelection>>()
 	{
 	}.getType();
@@ -83,20 +67,21 @@ class RecipeTab extends JPanel
 	{
 	}.getType();
 
-	private static final Color GREEN = Palette.OK;
-	private static final Color YELLOW = Palette.WARN;
-	private static final Color RED = Palette.BAD;
-	private static final Color BLUE = Palette.MAKE;
+	/** Width used to size wrapped text before the panel's first layout. */
+	static final int WIDTH_HINT = Theme.SIDEBAR_WIDTH - Theme.PANEL_PAD * 2 - Kit.ThinScrollBarUI.WIDTH;
 
 	private static final class SavedSelection
 	{
 		String key;
 		int quantity;
+		/** 0 when planning by count; otherwise the target level for the recipe's skill. */
+		int targetLevel;
 
-		SavedSelection(String key, int quantity)
+		SavedSelection(String key, int quantity, int targetLevel)
 		{
 			this.key = key;
 			this.quantity = quantity;
+			this.targetLevel = targetLevel;
 		}
 	}
 
@@ -104,11 +89,13 @@ class RecipeTab extends JPanel
 	{
 		final Recipe recipe;
 		int quantity;
+		int targetLevel;
 
-		Selection(Recipe recipe, int quantity)
+		Selection(Recipe recipe, int quantity, int targetLevel)
 		{
 			this.recipe = recipe;
 			this.quantity = quantity;
+			this.targetLevel = targetLevel;
 		}
 	}
 
@@ -120,21 +107,19 @@ class RecipeTab extends JPanel
 	private final IconCache icons;
 	private final PanelHost host;
 
-	private final JLabel statusLabel = new JLabel();
-	private final JComboBox<String> skillBox = new JComboBox<>();
-	private final IconTextField searchField = new IconTextField();
+	private final Kit.TextBlock statusText = new Kit.TextBlock(WIDTH_HINT - 30);
+	private final Kit.Dropdown<String> skillBox = new Kit.Dropdown<>();
+	private final Kit.SearchField search = new Kit.SearchField();
 	private DefaultListModel<Recipe> suggestionModel = new DefaultListModel<>();
 	private final JList<Recipe> suggestionList = new ViewportList<>(suggestionModel);
 	private final Timer searchTimer = new Timer(SEARCH_DELAY_MS, e -> updateSuggestions());
 	private final JScrollPane suggestionScroll;
-	private final JPanel selectedPanel = new JPanel();
-	private final JPanel materialsPanel = new JPanel();
+	private final JPanel body = new JPanel();
 
 	private final List<Selection> selections = new ArrayList<>();
 	private final Map<String, String> methods;
 	private final Set<String> collapsed = new HashSet<>();
 	private List<SavedSelection> pendingRestore;
-	private boolean updatingSkills;
 
 	RecipeTab(ItemStore store, RecipeRepository recipes, ConfigManager configManager, Gson gson,
 		MaterialPlannerConfig config, IconCache icons, PanelHost host, Runnable refreshRecipes)
@@ -149,40 +134,21 @@ class RecipeTab extends JPanel
 		this.methods = loadMethods();
 
 		setLayout(new BorderLayout());
-		setBackground(ColorScheme.DARK_GRAY_COLOR);
+		setOpaque(false);
 
-		// --- Controls ---------------------------------------------------------------------------
-		JPanel controls = new JPanel();
-		controls.setLayout(new BoxLayout(controls, BoxLayout.Y_AXIS));
-		controls.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		// --- Controls ------------------------------------------------------------------------------
+		JPanel controls = column();
+		controls.setBorder(new EmptyBorder(0, 0, Theme.GAP, Kit.ThinScrollBarUI.WIDTH));
 
-		JPanel statusRow = new JPanel(new BorderLayout());
-		statusRow.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		statusLabel.setFont(FontManager.getRunescapeSmallFont());
-		statusLabel.setForeground(Palette.FAINT);
-		JButton refresh = smallButton("↻", "Re-download recipes from the OSRS Wiki");
-		refresh.addActionListener(e -> refreshRecipes.run());
-		statusRow.add(statusLabel, BorderLayout.CENTER);
-		statusRow.add(refresh, BorderLayout.EAST);
-		controls.add(fullWidth(statusRow));
-		controls.add(Box.createVerticalStrut(4));
+		JPanel statusRow = new JPanel(new BorderLayout(6, 0));
+		statusRow.setOpaque(false);
+		statusRow.add(statusText, BorderLayout.CENTER);
+		statusRow.add(new Kit.IconButton(Icons.REFRESH, 20, "Re-download recipes from the OSRS Wiki")
+			.onClick(refreshRecipes), BorderLayout.EAST);
+		controls.add(stretch(statusRow));
+		controls.add(Box.createVerticalStrut(6));
 
-		skillBox.setFocusable(false);
-		skillBox.addActionListener(e ->
-		{
-			if (!updatingSkills)
-			{
-				updateSuggestions();
-			}
-		});
-		controls.add(fullWidth(skillBox));
-		controls.add(Box.createVerticalStrut(4));
-
-		searchField.setIcon(IconTextField.Icon.SEARCH);
-		searchField.setPreferredSize(new Dimension(PluginPanel.PANEL_WIDTH - 16, 30));
-		searchField.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-		searchField.setHoverBackgroundColor(ColorScheme.DARK_GRAY_HOVER_COLOR);
-		searchField.getDocument().addDocumentListener(new DocumentListener()
+		search.field.getDocument().addDocumentListener(new DocumentListener()
 		{
 			@Override
 			public void insertUpdate(DocumentEvent e)
@@ -202,7 +168,7 @@ class RecipeTab extends JPanel
 				searchTimer.restart();
 			}
 		});
-		searchField.addKeyListener(new KeyAdapter()
+		search.field.addKeyListener(new KeyAdapter()
 		{
 			@Override
 			public void keyPressed(KeyEvent e)
@@ -216,15 +182,23 @@ class RecipeTab extends JPanel
 				{
 					addSelection(suggestionModel.get(0));
 				}
+				else if (e.getKeyCode() == KeyEvent.VK_ESCAPE)
+				{
+					search.setText("");
+				}
 			}
 		});
-		controls.add(fullWidth(searchField));
+		controls.add(stretch(search));
+		controls.add(Box.createVerticalStrut(6));
 
-		// Autocomplete dropdown
+		skillBox.onChange(s -> updateSuggestions());
+		controls.add(stretch(skillBox));
+
 		searchTimer.setRepeats(false);
-		suggestionList.setFixedCellHeight(34);
+		suggestionList.setFixedCellHeight(SUGGESTION_ROW);
 		suggestionList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-		suggestionList.setBackground(Palette.ROW);
+		suggestionList.setOpaque(false);
+		suggestionList.setBackground(Theme.CARD);
 		suggestionList.setCellRenderer(new SuggestionRenderer());
 		suggestionList.addMouseListener(new MouseAdapter()
 		{
@@ -249,96 +223,61 @@ class RecipeTab extends JPanel
 				}
 			}
 		});
-		suggestionScroll = new JScrollPane(suggestionList);
-		suggestionScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-		suggestionScroll.setPreferredSize(new Dimension(PluginPanel.PANEL_WIDTH - 16, 200));
-		suggestionScroll.setBorder(BorderFactory.createMatteBorder(0, 1, 1, 1, ColorScheme.BORDER_COLOR));
-		suggestionScroll.setVisible(false);
-		controls.add(fullWidth(suggestionScroll));
-		controls.setBorder(new EmptyBorder(0, 0, 8, 0));
+		suggestionScroll = Kit.scroll(suggestionList);
+		suggestionScroll.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+		JPanel suggestionFrame = new Kit.Card(new BorderLayout()).fill(Theme.CARD);
+		suggestionFrame.setBorder(new EmptyBorder(3, 3, 3, 3));
+		suggestionFrame.add(suggestionScroll, BorderLayout.CENTER);
+		suggestionFrame.setPreferredSize(new Dimension(WIDTH_HINT, SUGGESTION_ROW * 6 + 6));
+		suggestionFrame.setMaximumSize(new Dimension(Integer.MAX_VALUE, SUGGESTION_ROW * 6 + 6));
+		suggestionFrame.setVisible(false);
+		this.suggestionFrame = suggestionFrame;
+		controls.add(Box.createVerticalStrut(4));
+		controls.add(stretch(suggestionFrame));
 
 		add(controls, BorderLayout.NORTH);
 
-		// --- Body: selected recipes + materials --------------------------------------------------
-		JPanel body = new JPanel();
+		// --- Body ------------------------------------------------------------------------------------
 		body.setLayout(new BoxLayout(body, BoxLayout.Y_AXIS));
-		body.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		body.setBorder(new EmptyBorder(4, 0, 0, 0));
-
-		JPanel makingHeader = new JPanel(new BorderLayout());
-		makingHeader.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		makingHeader.add(sectionHeader("MAKING"), BorderLayout.WEST);
-		JButton clearAll = smallButton("Clear all", "Remove every recipe from the list");
-		clearAll.setFont(FontManager.getRunescapeSmallFont());
-		clearAll.addActionListener(e ->
-		{
-			if (selections.isEmpty())
-			{
-				return;
-			}
-			int choice = JOptionPane.showConfirmDialog(this,
-				"Remove all " + selections.size() + " recipes from the list?", "Clear all",
-				JOptionPane.OK_CANCEL_OPTION);
-			if (choice == JOptionPane.OK_OPTION)
-			{
-				selections.clear();
-				afterSelectionChange();
-			}
-		});
-		makingHeader.add(clearAll, BorderLayout.EAST);
-		body.add(fullWidth(makingHeader));
-
-		selectedPanel.setLayout(new BoxLayout(selectedPanel, BoxLayout.Y_AXIS));
-		selectedPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		body.add(leftAlign(selectedPanel));
-		body.add(Box.createVerticalStrut(10));
-
-		materialsPanel.setLayout(new BoxLayout(materialsPanel, BoxLayout.Y_AXIS));
-		materialsPanel.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		body.add(leftAlign(materialsPanel));
-
-		JPanel bodyWrap = new WidthTrackingPanel(new BorderLayout());
-		bodyWrap.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		bodyWrap.add(body, BorderLayout.NORTH);
-		JScrollPane scroll = new JScrollPane(bodyWrap);
-		scroll.setBorder(null);
-		scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-		scroll.getVerticalScrollBar().setUnitIncrement(16);
-		add(scroll, BorderLayout.CENTER);
+		body.setOpaque(false);
+		JPanel wrap = new Kit.WidthTracking(new BorderLayout());
+		wrap.add(body, BorderLayout.NORTH);
+		add(Kit.scroll(wrap), BorderLayout.CENTER);
 
 		pendingRestore = loadSavedSelection();
 		onRecipesLoaded();
 	}
 
-	// --- recipes & suggestions -------------------------------------------------------------------
+	private final JPanel suggestionFrame;
+
+	// =================================================================================================
+	// Recipes & suggestions
 
 	void onRecipesLoaded()
 	{
-		statusLabel.setText(recipes.getStatus());
+		int total = recipes.getRecipes().size();
+		statusText.lines(new Kit.Line(recipes.getStatus(), Theme.small(), Theme.FAINT));
+		search.placeholder(total > 0 ? "Search " + Theme.n(total) + " recipes" : "Search recipes");
 
-		Object current = skillBox.getSelectedItem();
-		updatingSkills = true;
-		skillBox.removeAllItems();
-		skillBox.addItem(ALL_SKILLS);
-		for (String s : recipes.getSkills())
+		String current = skillBox.getSelected();
+		List<String> skills = new ArrayList<>();
+		skills.add(ALL_SKILLS);
+		skills.addAll(recipes.getSkills());
+		skillBox.setItems(skills, s -> s);
+		if (current != null)
 		{
-			skillBox.addItem(s);
+			skillBox.setSelected(current);
 		}
-		skillBox.setSelectedItem(current != null ? current : ALL_SKILLS);
-		updatingSkills = false;
 
 		restoreSelections();
 		updateSuggestions();
-		rebuildSelected();
+		rebuild();
 	}
 
-	/**
-	 * Levels or settings changed: redraw everything that depends on them.
-	 */
 	void refreshAll()
 	{
 		suggestionList.repaint();
-		rebuildSelected();
+		rebuild();
 	}
 
 	private void restoreSelections()
@@ -362,27 +301,23 @@ class RecipeTab extends JPanel
 			}
 			else if (selections.stream().noneMatch(x -> x.recipe.equals(r)))
 			{
-				selections.add(new Selection(r, Math.max(1, s.quantity)));
+				selections.add(new Selection(r, Math.max(1, s.quantity), Math.max(0, s.targetLevel)));
 			}
 		}
-		// Keep waiting for recipes that may arrive with the wiki download
 		pendingRestore = stillMissing.isEmpty() ? null : stillMissing;
 	}
 
 	private void updateSuggestions()
 	{
-		String query = searchField.getText() == null ? "" : searchField.getText().trim().toLowerCase(Locale.ROOT);
-		Object skillSel = skillBox.getSelectedItem();
-		String skill = skillSel == null || ALL_SKILLS.equals(skillSel) ? null : skillSel.toString();
-		boolean hideUnmet = config.levelCheck() && config.hideUnmet();
+		String query = search.getText() == null ? "" : search.getText().trim().toLowerCase(Locale.ROOT);
+		String skillSel = skillBox.getSelected();
+		String skill = skillSel == null || ALL_SKILLS.equals(skillSel) ? null : skillSel;
+		boolean hideBlocked = config.levelCheck() && config.hideUnmet();
 
 		DefaultListModel<Recipe> model = new DefaultListModel<>();
 		if (query.isEmpty() && skill == null)
 		{
-			suggestionModel = model;
-			suggestionList.setModel(model);
-			suggestionScroll.setVisible(false);
-			revalidate();
+			setSuggestions(model);
 			return;
 		}
 
@@ -395,7 +330,7 @@ class RecipeTab extends JPanel
 			{
 				continue;
 			}
-			if (hideUnmet && !unmetLevels(r).isEmpty())
+			if (hideBlocked && !blockers(r).isEmpty())
 			{
 				continue;
 			}
@@ -427,10 +362,19 @@ class RecipeTab extends JPanel
 				model.addElement(r);
 			}
 		}
+		setSuggestions(model);
+	}
 
+	private void setSuggestions(DefaultListModel<Recipe> model)
+	{
 		suggestionModel = model;
 		suggestionList.setModel(model);
-		suggestionScroll.setVisible(!model.isEmpty());
+		int rows = Math.min(6, Math.max(1, model.size()));
+		Dimension d = new Dimension(WIDTH_HINT, SUGGESTION_ROW * rows + 6);
+		suggestionFrame.setPreferredSize(d);
+		suggestionFrame.setMaximumSize(new Dimension(Integer.MAX_VALUE, d.height));
+		suggestionFrame.setVisible(!model.isEmpty());
+		suggestionList.ensureIndexIsVisible(0);
 		revalidate();
 		repaint();
 	}
@@ -441,126 +385,288 @@ class RecipeTab extends JPanel
 		{
 			if (s.recipe.equals(recipe))
 			{
-				s.quantity++;
+				if (s.targetLevel == 0)
+				{
+					s.quantity++;
+				}
 				afterSelectionChange();
 				return;
 			}
 		}
-		selections.add(new Selection(recipe, 1));
-		searchField.setText("");
+		selections.add(new Selection(recipe, 1, 0));
+		search.setText("");
 		afterSelectionChange();
 	}
 
 	private void afterSelectionChange()
 	{
 		saveSelection();
-		rebuildSelected();
+		rebuild();
 	}
 
-	// --- levels ----------------------------------------------------------------------------------
+	// =================================================================================================
+	// Requirements
 
 	/**
-	 * Requirements the player doesn't meet, e.g. ["Crafting 61 (you 55)"]. Empty when met or levels unknown.
+	 * Reasons the player can't do a recipe right now, e.g. "Crafting 61 (you 55)", "Members only",
+	 * "Quest: Dragon Slayer I". Empty when nothing is known to block it.
 	 */
-	private List<String> unmetLevels(Recipe r)
+	List<String> blockers(Recipe r)
 	{
 		List<String> out = new ArrayList<>();
-		if (!config.levelCheck())
+		if (config.levelCheck())
 		{
-			return out;
-		}
-		for (Recipe.SkillReq s : r.skills)
-		{
-			int have = host.realLevel(s.name);
-			if (have >= 0 && s.level > have)
+			for (Recipe.SkillReq s : r.skills)
 			{
-				out.add(s.name + " " + s.level + " (you " + have + ")");
+				int have = host.realLevel(s.name);
+				if (have >= 0 && s.level > have)
+				{
+					out.add(s.name + " " + s.level + " (you " + have + ")");
+				}
 			}
+		}
+		if (r.members && Boolean.FALSE.equals(host.membersWorld()))
+		{
+			out.add("Members only");
+		}
+		for (String q : host.unmetQuests(r.quest))
+		{
+			out.add("Quest: " + q);
 		}
 		return out;
 	}
 
-	// --- Making list -----------------------------------------------------------------------------
-
-	private void rebuildSelected()
+	/**
+	 * How many times a selection will be made: its count, or the actions needed to reach its target level.
+	 */
+	private int effectiveQuantity(Selection s)
 	{
-		selectedPanel.removeAll();
+		if (s.targetLevel <= 0)
+		{
+			return s.quantity;
+		}
+		Recipe.SkillReq skill = s.recipe.xpSkill();
+		if (skill == null)
+		{
+			// No XP data (e.g. after a data refresh): fall back to the count
+			return s.quantity;
+		}
+		long xp = host.skillXp(skill.name);
+		if (xp < 0)
+		{
+			return 0;
+		}
+		return Xp.actionsToLevel(xp, s.targetLevel, skill.experience);
+	}
+
+	// =================================================================================================
+	// Body
+
+	private void rebuild()
+	{
+		body.removeAll();
+
+		JPanel makingHeader = new JPanel(new BorderLayout());
+		makingHeader.setOpaque(false);
+		Kit.SectionHeader making = new Kit.SectionHeader("MAKING");
+		if (!selections.isEmpty())
+		{
+			making.detail(String.valueOf(selections.size()));
+		}
+		makingHeader.add(making, BorderLayout.CENTER);
+		if (!selections.isEmpty())
+		{
+			makingHeader.add(new Kit.TextButton("Clear all").onClick(this::confirmClear), BorderLayout.EAST);
+		}
+		body.add(stretch(makingHeader));
+		body.add(Box.createVerticalStrut(4));
+
 		if (selections.isEmpty())
 		{
-			selectedPanel.add(fullWidth(hint("Search above or pick a skill, then click a recipe to add it.")));
+			body.add(stretch(emptyState()));
 		}
 		for (Selection s : selections)
 		{
-			selectedPanel.add(fullWidth(selectionRow(s)));
-			selectedPanel.add(Box.createVerticalStrut(4));
+			body.add(stretch(makingCard(s)));
+			body.add(Box.createVerticalStrut(6));
 		}
-		selectedPanel.revalidate();
-		selectedPanel.repaint();
-		refreshMaterials();
+
+		buildPlan();
+
+		body.revalidate();
+		body.repaint();
 	}
 
-	private JComponent selectionRow(Selection s)
+	private void confirmClear()
 	{
-		JPanel row = new JPanel(new BorderLayout(4, 0));
-		row.setBackground(Palette.ROW);
-		row.setBorder(new EmptyBorder(6, 8, 6, 4));
-
-		List<String> unmet = unmetLevels(s.recipe);
-		String sub = unmet.isEmpty() ? escape(s.recipe.subtitle())
-			: "<font color='" + hex(RED) + "'>Needs " + escape(String.join(", ", unmet)) + "</font>";
-		JLabel name = new JLabel("<html><body style='width:" + ROW_TEXT_WIDTH + "px'>" + escape(s.recipe.toString())
-			+ "<br><font color='" + hex(Palette.MUTED) + "'>" + sub + "</font></body></html>");
-		name.setForeground(Palette.TEXT);
-		name.setFont(FontManager.getRunescapeSmallFont());
-		name.setToolTipText(s.recipe.tools == null ? null : "Tools: " + s.recipe.tools);
-		row.add(name, BorderLayout.CENTER);
-
-		JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 3, 0));
-		right.setOpaque(false);
-		JSpinner qty = new JSpinner(new SpinnerNumberModel(s.quantity, 1, 1_000_000, 1));
-		qty.setPreferredSize(new Dimension(50, 22));
-		qty.setToolTipText("How many times you will make this");
-		qty.addChangeListener(e ->
+		int choice = JOptionPane.showConfirmDialog(this,
+			"Remove all " + selections.size() + " recipes from the list?", "Clear all",
+			JOptionPane.OK_CANCEL_OPTION);
+		if (choice == JOptionPane.OK_OPTION)
 		{
-			s.quantity = (Integer) qty.getValue();
-			saveSelection();
-			refreshMaterials();
-		});
-		JLabel remove = new JLabel(IconCache.removeIcon(RED));
-		remove.setToolTipText("Remove from list");
-		remove.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		remove.setBorder(new EmptyBorder(4, 4, 4, 2));
-		remove.addMouseListener(new MouseAdapter()
+			selections.clear();
+			afterSelectionChange();
+		}
+	}
+
+	private JComponent emptyState()
+	{
+		Kit.Card card = new Kit.Card(new BorderLayout()).fill(Theme.CARD).edge(Theme.CARD_BORDER);
+		card.setBorder(new EmptyBorder(14, 12, 14, 12));
+		Kit.TextBlock t = new Kit.TextBlock(WIDTH_HINT - 24).lines(
+			new Kit.Line("Nothing planned yet", Theme.bold(), Theme.TEXT),
+			new Kit.Line("Search above, or pick a skill to browse everything you can make in it.", Theme.small(), Theme.MUTED, 3));
+		card.add(t, BorderLayout.CENTER);
+		return card;
+	}
+
+	private JComponent makingCard(Selection s)
+	{
+		Kit.Card card = new Kit.Card(new BorderLayout(0, 6));
+		List<String> blocked = blockers(s.recipe);
+		if (!blocked.isEmpty())
 		{
-			@Override
-			public void mouseClicked(MouseEvent e)
+			card.accent(Theme.BAD);
+		}
+
+		// Top: icon, name + requirements, remove
+		JPanel top = new JPanel(new BorderLayout(Theme.GAP, 0));
+		top.setOpaque(false);
+		Kit.Slot slot = new Kit.Slot();
+		slot.icon(iconFor(s.recipe.name, slot));
+		top.add(slot, BorderLayout.WEST);
+
+		String sub = blocked.isEmpty() ? s.recipe.subtitle() : "Needs " + String.join(", ", blocked);
+		Kit.TextBlock text = new Kit.TextBlock(WIDTH_HINT - 90).lines(
+			new Kit.Line(s.recipe.toString(), Theme.small(), Theme.TEXT, 2),
+			new Kit.Line(sub, Theme.small(), blocked.isEmpty() ? Theme.MUTED : Theme.BAD, 2));
+		if (s.recipe.tools != null)
+		{
+			text.setToolTipText("Tools: " + s.recipe.tools);
+		}
+		top.add(text, BorderLayout.CENTER);
+
+		JPanel removeWrap = new JPanel(new BorderLayout());
+		removeWrap.setOpaque(false);
+		removeWrap.add(new Kit.IconButton(Icons.CROSS, 20, "Remove from list")
+			.colors(Theme.FAINT, Theme.BAD)
+			.onClick(() ->
 			{
 				selections.remove(s);
 				afterSelectionChange();
+			}), BorderLayout.NORTH);
+		top.add(removeWrap, BorderLayout.EAST);
+		card.add(top, BorderLayout.NORTH);
+
+		// Bottom: Count / Level mode and the number
+		Recipe.SkillReq xpSkill = s.recipe.xpSkill();
+		JPanel controls = new JPanel(new GridLayout(1, 2, 6, 0));
+		controls.setOpaque(false);
+		Kit.Segmented mode = new Kit.Segmented(false, "Count", "Level");
+		mode.setSelectedQuietly(s.targetLevel > 0 && xpSkill != null ? 1 : 0);
+		mode.setToolTipText(xpSkill == null ? "No XP data for this recipe, so it can only be planned by count"
+			: "Plan by count, or by a target " + xpSkill.name + " level");
+		Kit.Stepper stepper = new Kit.Stepper(1, 1, 1_000_000);
+		configureStepper(stepper, s, xpSkill);
+		stepper.onChange(v ->
+		{
+			if (s.targetLevel > 0)
+			{
+				s.targetLevel = v;
 			}
+			else
+			{
+				s.quantity = v;
+			}
+			saveSelection();
+			rebuild();
 		});
-		right.add(qty);
-		right.add(remove);
-		row.add(right, BorderLayout.EAST);
-		return row;
+		mode.onChange(i ->
+		{
+			if (i == 1 && xpSkill == null)
+			{
+				mode.setSelectedQuietly(0);
+				return;
+			}
+			if (i == 1)
+			{
+				int cur = Math.max(1, host.realLevel(xpSkill.name));
+				s.targetLevel = Math.min(Xp.MAX_LEVEL, cur + 1);
+			}
+			else
+			{
+				s.targetLevel = 0;
+			}
+			saveSelection();
+			rebuild();
+		});
+		controls.add(mode);
+		controls.add(stepper);
+
+		JPanel bottom = new JPanel(new BorderLayout(0, 4));
+		bottom.setOpaque(false);
+		bottom.add(controls, BorderLayout.NORTH);
+		String goal = goalText(s, xpSkill);
+		if (goal != null)
+		{
+			bottom.add(new Kit.TextBlock(WIDTH_HINT - 24).lines(new Kit.Line(goal, Theme.small(), Theme.MAKE, 2)), BorderLayout.CENTER);
+		}
+		card.add(bottom, BorderLayout.CENTER);
+		return card;
 	}
 
-	// --- Materials tree --------------------------------------------------------------------------
-
-	void refreshMaterials()
+	private void configureStepper(Kit.Stepper stepper, Selection s, Recipe.SkillReq xpSkill)
 	{
-		materialsPanel.removeAll();
+		if (s.targetLevel > 0 && xpSkill != null)
+		{
+			int cur = Math.max(1, host.realLevel(xpSkill.name));
+			stepper.range(Math.min(Xp.MAX_LEVEL, cur + 1), Xp.MAX_LEVEL).prefix("Lv ");
+			stepper.setQuietly(s.targetLevel);
+		}
+		else
+		{
+			stepper.range(1, 1_000_000).prefix("x");
+			stepper.setQuietly(s.quantity);
+		}
+	}
 
+	private String goalText(Selection s, Recipe.SkillReq xpSkill)
+	{
+		if (s.targetLevel <= 0 || xpSkill == null)
+		{
+			return null;
+		}
+		long xp = host.skillXp(xpSkill.name);
+		if (xp < 0)
+		{
+			return "Log in to plan by level";
+		}
+		int actions = effectiveQuantity(s);
+		if (actions == 0)
+		{
+			return "Already " + xpSkill.name + " " + Xp.levelFor(xp);
+		}
+		long needed = Xp.forLevel(s.targetLevel) - xp;
+		return Theme.n(actions) + " actions to " + xpSkill.name + " " + s.targetLevel + " (" + Theme.gp(needed) + " xp)";
+	}
+
+	// =================================================================================================
+	// Plan: overview, tools, materials
+
+	private void buildPlan()
+	{
 		Map<Recipe, Integer> sel = new LinkedHashMap<>();
 		for (Selection s : selections)
 		{
-			sel.merge(s.recipe, s.quantity, Integer::sum);
+			int q = effectiveQuantity(s);
+			if (q > 0)
+			{
+				sel.merge(s.recipe, q, Integer::sum);
+			}
 		}
 		if (sel.isEmpty())
 		{
 			host.onPlanChanged(new HashSet<>());
-			materialsPanel.revalidate();
-			materialsPanel.repaint();
 			return;
 		}
 
@@ -569,69 +675,67 @@ class RecipeTab extends JPanel
 		opt.includeWorn = config.countWorn();
 		opt.includeOther = config.countOtherStorage();
 		opt.methods = methods;
+		opt.stackable = name -> Boolean.TRUE.equals(host.stackable(name));
 		Map<String, Counts> stock = store.countsByName();
 		Planner.Plan plan = Planner.plan(sel, recipes.getByOutput(), stock, opt);
 		host.onPlanChanged(new HashSet<>(plan.fromBank.keySet()));
 
-		materialsPanel.add(fullWidth(sectionHeader("MATERIALS")));
-		materialsPanel.add(fullWidth(summaryLine(plan)));
-		for (JComponent c : costLines(plan))
+		body.add(Box.createVerticalStrut(6));
+		body.add(stretch(new Kit.SectionHeader("OVERVIEW")));
+		body.add(Box.createVerticalStrut(4));
+		body.add(stretch(overview(plan)));
+
+		if (!plan.tools.isEmpty())
 		{
-			materialsPanel.add(fullWidth(c));
+			body.add(Box.createVerticalStrut(Theme.GAP + 4));
+			Kit.SectionHeader th = new Kit.SectionHeader("TOOLS");
+			th.detail(String.valueOf(plan.tools.size()));
+			body.add(stretch(th));
+			body.add(Box.createVerticalStrut(4));
+			body.add(stretch(toolsCard(plan, stock, opt)));
 		}
-		materialsPanel.add(Box.createVerticalStrut(8));
+
+		body.add(Box.createVerticalStrut(Theme.GAP + 4));
+		Kit.SectionHeader mh = new Kit.SectionHeader("MATERIALS");
+		mh.detail(String.valueOf(plan.roots.size()));
+		body.add(stretch(mh));
+		body.add(Box.createVerticalStrut(4));
 
 		for (Planner.Node root : plan.roots)
 		{
-			addNodeRows(root, "", stock, opt);
+			Kit.Card group = new Kit.Card(null);
+			group.setLayout(new BoxLayout(group, BoxLayout.Y_AXIS));
+			group.setBorder(new EmptyBorder(1, 2, 1, 2));
+			addNodeRows(group, root, "", stock, opt, new boolean[0], 0);
+			body.add(stretch(group));
+			body.add(Box.createVerticalStrut(5));
 		}
 
-		if (!store.hasBankSnapshot())
-		{
-			materialsPanel.add(fullWidth(hint("No bank snapshot yet: open your bank once so bank counts are included.")));
-		}
-		else
-		{
-			materialsPanel.add(fullWidth(hint("Bank as of " + MaterialPlannerPanel.ago(store.getBankTime())
-				+ ". Right-click an item to choose how it's made.")));
-		}
-		materialsPanel.revalidate();
-		materialsPanel.repaint();
+		String when = store.hasBankSnapshot()
+			? "Bank as of " + MaterialPlannerPanel.ago(store.getBankTime()) + ". Right-click a material to choose how it's made."
+			: "No bank snapshot yet: open your bank once so bank counts are included.";
+		body.add(Box.createVerticalStrut(2));
+		body.add(stretch(new Kit.TextBlock(WIDTH_HINT).lines(new Kit.Line(when, Theme.small(), Theme.FAINT, 3))));
 	}
 
-	private JComponent summaryLine(Planner.Plan plan)
+	private JComponent overview(Planner.Plan plan)
 	{
-		List<String> parts = new ArrayList<>();
-		parts.add("<font color='" + hex(GREEN) + "'>" + plan.ready + " ready</font>");
-		if (plan.toMake > 0)
-		{
-			parts.add("<font color='" + hex(BLUE) + "'>" + plan.toMake + " to make</font>");
-		}
-		if (plan.shortCount > 0)
-		{
-			parts.add("<font color='" + hex(RED) + "'>" + plan.shortCount + " short</font>");
-		}
-		JLabel l = new JLabel("<html>" + String.join(" · ", parts) + "</html>");
-		l.setFont(FontManager.getRunescapeSmallFont());
-		return l;
-	}
+		Kit.Card card = new Kit.Card(null);
+		card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
 
-	private List<JComponent> costLines(Planner.Plan plan)
-	{
-		List<JComponent> out = new ArrayList<>();
+		StackBar bar = new StackBar(plan.ready, plan.toMake, plan.shortCount);
+		card.add(stretch(bar));
+		card.add(Box.createVerticalStrut(6));
+		card.add(stretch(new Legend(plan.ready, plan.toMake, plan.shortCount)));
+
+		List<Kit.Line> lines = new ArrayList<>();
 		CostMode mode = host.effectiveCostMode();
-		if (mode == CostMode.OFF)
+		if (mode != CostMode.OFF && plan.coinsNeeded > 0)
 		{
-			return out;
+			boolean enough = plan.coinsAvailable >= plan.coinsNeeded;
+			lines.add(new Kit.Line("Coins: " + Theme.gp(plan.coinsNeeded) + " needed, " + Theme.gp(plan.coinsAvailable) + " owned",
+				Theme.small(), enough ? Theme.OK : Theme.BAD, 2));
 		}
-		NumberFormat nf = NumberFormat.getIntegerInstance();
-
-		if (plan.coinsNeeded > 0)
-		{
-			Color c = plan.coinsAvailable >= plan.coinsNeeded ? GREEN : RED;
-			out.add(smallLine("Coins needed " + nf.format(plan.coinsNeeded) + " · have " + nf.format(plan.coinsAvailable), c));
-		}
-
 		if (mode == CostMode.GE_PRICES && !plan.shortages.isEmpty())
 		{
 			long total = 0;
@@ -652,30 +756,97 @@ class RecipeTab extends JPanel
 					unpriced++;
 				}
 			}
-			String text = "Buy what's short ≈ " + shortGp(total) + " gp"
-				+ (unpriced > 0 ? " (+" + unpriced + " untradeable)" : "");
-			out.add(smallLine(text, Palette.MUTED));
+			lines.add(new Kit.Line("Buying what's short: ~" + Theme.gp(total) + " gp"
+				+ (unpriced > 0 ? " (" + unpriced + " untradeable)" : ""), Theme.small(), Theme.MUTED, 2));
 		}
-		return out;
+		int inv = Planner.inventories(plan.inventorySlots);
+		if (inv > 0)
+		{
+			lines.add(new Kit.Line("About " + inv + (inv == 1 ? " inventory" : " inventories") + " of materials to carry",
+				Theme.small(), Theme.MUTED, 2));
+		}
+		if (!lines.isEmpty())
+		{
+			card.add(Box.createVerticalStrut(6));
+			card.add(stretch(new Kit.TextBlock(WIDTH_HINT - 24).lines(lines.toArray(new Kit.Line[0]))));
+		}
+		return card;
 	}
 
-	private void addNodeRows(Planner.Node n, String parentPath, Map<String, Counts> stock, Planner.Options opt)
+	private JComponent toolsCard(Planner.Plan plan, Map<String, Counts> stock, Planner.Options opt)
+	{
+		Kit.Card card = new Kit.Card(null);
+		card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
+		card.setBorder(new EmptyBorder(4, Theme.GAP, 4, Theme.GAP));
+		for (Planner.ToolNeed t : plan.tools)
+		{
+			long carried = 0;
+			long stored = 0;
+			boolean knownItem = false;
+			for (String alt : t.alternatives)
+			{
+				Counts c = stock.get(Planner.normalize(alt));
+				if (c != null)
+				{
+					carried += c.carried(opt.includeWorn);
+					stored += c.bank() + (opt.includeOther ? c.other() : 0);
+					knownItem = true;
+				}
+				if (icons.idForName(alt) > 0)
+				{
+					knownItem = true;
+				}
+			}
+			String state;
+			Color color;
+			if (carried > 0)
+			{
+				state = "On you";
+				color = Theme.OK;
+			}
+			else if (stored > 0)
+			{
+				state = "In bank";
+				color = Theme.WARN;
+			}
+			else if (knownItem)
+			{
+				state = "Missing";
+				color = Theme.BAD;
+			}
+			else
+			{
+				// Spells and untradeable unlocks we can't check for
+				state = "Needed";
+				color = Theme.MUTED;
+			}
+			ToolRow row = new ToolRow(t.label(), state, color);
+			row.setToolTipText("Used by " + String.join(", ", t.usedBy));
+			card.add(stretch(row));
+		}
+		return card;
+	}
+
+	private void addNodeRows(JComponent parent, Planner.Node n, String parentPath, Map<String, Counts> stock,
+		Planner.Options opt, boolean[] rails, int depth)
 	{
 		String path = n.path(parentPath);
-		materialsPanel.add(fullWidth(nodeRow(n, path, stock, opt)));
-		materialsPanel.add(Box.createVerticalStrut(2));
+		parent.add(stretch(nodeRow(n, path, stock, opt, rails, depth)));
 		if (!n.children.isEmpty() && !collapsed.contains(path))
 		{
-			for (Planner.Node c : n.children)
+			for (int i = 0; i < n.children.size(); i++)
 			{
-				addNodeRows(c, path, stock, opt);
+				boolean last = i == n.children.size() - 1;
+				boolean[] childRails = java.util.Arrays.copyOf(rails, depth + 2);
+				childRails[depth + 1] = !last;
+				addNodeRows(parent, n.children.get(i), path, stock, opt, childRails, depth + 1);
 			}
 		}
 	}
 
-	private JComponent nodeRow(Planner.Node n, String path, Map<String, Counts> stock, Planner.Options opt)
+	private MaterialRow nodeRow(Planner.Node n, String path, Map<String, Counts> stock, Planner.Options opt,
+		boolean[] rails, int depth)
 	{
-		NumberFormat nf = NumberFormat.getIntegerInstance();
 		Counts c = stock.getOrDefault(n.key, new Counts());
 		long have = c.total(opt.includeWorn, opt.includeOther);
 
@@ -684,144 +855,124 @@ class RecipeTab extends JPanel
 		switch (n.status())
 		{
 			case ON_YOU:
-				status = GREEN;
+				status = Theme.OK;
 				verdict = "On you";
 				break;
 			case IN_STORAGE:
-				status = YELLOW;
-				verdict = withdrawText(n, nf);
+				status = Theme.WARN;
+				verdict = withdrawText(n);
 				break;
 			case MAKE:
-				status = n.subtreeShort() ? RED : BLUE;
-				verdict = makeText(n, nf);
+				status = n.subtreeShort() ? Theme.BAD : Theme.MAKE;
+				verdict = makeText(n);
 				break;
 			default:
-				status = RED;
-				verdict = "Need " + nf.format(n.shortBy) + " more" + priceSuffix(n.name, n.shortBy);
+				status = Theme.BAD;
+				verdict = "Need " + Theme.n(n.shortBy) + " more" + priceSuffix(n.name, n.shortBy);
 				break;
 		}
 
-		JPanel row = new JPanel(new BorderLayout(6, 0));
-		row.setBackground(Palette.ROW);
-		int indent = n.depth * INDENT;
-		row.setBorder(BorderFactory.createCompoundBorder(
-			BorderFactory.createMatteBorder(0, indent, 0, 0, Palette.PANEL),
-			BorderFactory.createCompoundBorder(
-				BorderFactory.createMatteBorder(0, 2, 0, 0, status),
-				new EmptyBorder(4, 4, 4, 6))));
+		boolean expandable = !n.children.isEmpty();
+		MaterialRow row = new MaterialRow(n.name, have, n.need, status, depth, expandable, collapsed.contains(path), WIDTH_HINT - 4)
+			.rails(rails)
+			.detail(verdict, status, 2);
 
-		// Expand/collapse arrow for crafted items, then the item sprite
-		JPanel west = new JPanel(new BorderLayout());
-		west.setOpaque(false);
-		JLabel arrow = new JLabel(n.children.isEmpty() ? "" : (collapsed.contains(path) ? "▸" : "▾"));
-		arrow.setForeground(Palette.MUTED);
-		arrow.setPreferredSize(new Dimension(n.children.isEmpty() ? 0 : 10, 10));
-		if (!n.children.isEmpty())
-		{
-			arrow.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-			arrow.setToolTipText("Show or hide ingredients");
-			arrow.addMouseListener(new MouseAdapter()
-			{
-				@Override
-				public void mouseClicked(MouseEvent e)
-				{
-					if (!collapsed.remove(path))
-					{
-						collapsed.add(path);
-					}
-					refreshMaterials();
-				}
-			});
-		}
-		west.add(arrow, BorderLayout.WEST);
-
-		int id = store.idForName(n.name);
-		if (id <= 0)
-		{
-			id = icons.idForName(n.name);
-		}
-		JLabel icon = new JLabel();
-		icon.setPreferredSize(new Dimension(34, 30));
-		icon.setHorizontalAlignment(SwingConstants.CENTER);
-		if (id > 0)
-		{
-			icon.setIcon(icons.get(id, icon));
-		}
-		west.add(icon, BorderLayout.CENTER);
-		row.add(west, BorderLayout.WEST);
-
-		String levelWarn = "";
 		if (n.via != null)
 		{
-			List<String> unmet = unmetLevels(n.via);
-			if (!unmet.isEmpty())
+			List<String> blocked = blockers(n.via);
+			if (!blocked.isEmpty())
 			{
-				levelWarn = "<br><font color='" + hex(RED) + "'>Needs " + escape(String.join(", ", unmet)) + "</font>";
+				row.detail("Needs " + String.join(", ", blocked), Theme.BAD, 2);
+			}
+		}
+		if (n.shortBy > 0 && n.via == null)
+		{
+			List<ShopSource> shops = recipes.getShops(n.name);
+			if (!shops.isEmpty())
+			{
+				row.detail("Shop: " + shopText(shops.get(0)) + (shops.size() > 1 ? " (+" + (shops.size() - 1) + " more)" : ""),
+					Theme.MUTED, 2);
 			}
 		}
 
-		// Two lines: the item, then "have/need · what to do". Where it's stored is in the tooltip.
-		int width = Math.max(60, TEXT_WIDTH - 45 - indent);
-		Color countColor = have >= n.need ? Palette.MUTED : status;
-		JLabel text = new JLabel("<html><body style='width:" + width + "px'>"
-			+ "<font color='" + hex(Palette.TEXT) + "'>" + escape(n.name) + "</font>"
-			+ "<br><font color='" + hex(countColor) + "'>" + nf.format(have) + "/" + nf.format(n.need) + "</font>"
-			+ "<font color='" + hex(Palette.FAINT) + "'> · </font>"
-			+ "<font color='" + hex(status) + "'>" + escape(verdict) + "</font>" + levelWarn
-			+ "</body></html>");
-		text.setFont(FontManager.getRunescapeSmallFont());
-		row.add(text, BorderLayout.CENTER);
-
-		String tip = locationTooltip(c);
-		row.setToolTipText(tip);
-		text.setToolTipText(tip);
+		row.icon(iconFor(n.name, row));
+		if (expandable)
+		{
+			row.onToggle(() ->
+			{
+				if (!collapsed.remove(path))
+				{
+					collapsed.add(path);
+				}
+				rebuild();
+			});
+		}
+		row.setToolTipText(tooltip(n, c));
 		attachMethodMenu(row, n);
-		attachMethodMenu(text, n);
 		return row;
 	}
 
-	private static void appendCount(StringBuilder sb, String label, long qty, NumberFormat nf)
+	private static String shopText(ShopSource s)
 	{
-		if (qty <= 0)
-		{
-			return;
-		}
-		if (sb.length() > 0)
-		{
-			sb.append(" · ");
-		}
-		sb.append(label).append(' ').append(nf.format(qty));
+		String price = s.price < 0 ? "" : " · " + Theme.n(s.price) + (s.isCoins() ? " gp" : " " + s.currency.toLowerCase(Locale.ROOT));
+		return s.store + price;
 	}
 
-	private static String withdrawText(Planner.Node n, NumberFormat nf)
+	private String tooltip(Planner.Node n, Counts c)
+	{
+		StringBuilder sb = new StringBuilder("<html><b>").append(Theme.escape(n.name)).append("</b><br>");
+		if (c.asMap().isEmpty())
+		{
+			sb.append("None owned<br>");
+		}
+		for (Map.Entry<Location, Long> e : c.asMap().entrySet())
+		{
+			sb.append(Theme.escape(store.label(e.getKey()))).append(": ").append(Theme.n(e.getValue())).append("<br>");
+		}
+		List<ShopSource> shops = n.shortBy > 0 ? recipes.getShops(n.name) : java.util.Collections.emptyList();
+		if (!shops.isEmpty())
+		{
+			sb.append("<br>Sold by:<br>");
+			for (int i = 0; i < Math.min(5, shops.size()); i++)
+			{
+				sb.append("&nbsp;&nbsp;").append(Theme.escape(shopText(shops.get(i)))).append("<br>");
+			}
+		}
+		if (!n.alternatives.isEmpty())
+		{
+			sb.append("<br><i>Right-click to choose how it's made</i>");
+		}
+		return sb.append("</html>").toString();
+	}
+
+	private static String withdrawText(Planner.Node n)
 	{
 		List<String> parts = new ArrayList<>();
 		if (n.fromBank > 0)
 		{
-			parts.add(nf.format(n.fromBank) + " from bank");
+			parts.add(Theme.n(n.fromBank) + " from bank");
 		}
 		if (n.fromOther > 0)
 		{
-			parts.add(nf.format(n.fromOther) + " from other storage");
+			parts.add(Theme.n(n.fromOther) + " from storage");
 		}
 		return "Withdraw " + String.join(", ", parts);
 	}
 
-	private static String makeText(Planner.Node n, NumberFormat nf)
+	private static String makeText(Planner.Node n)
 	{
 		long out = Math.max(1, n.via.outputQuantity);
 		String make = out > 1
-			? "Make " + nf.format(n.crafts * out) + " (" + nf.format(n.crafts) + " actions)"
-			: "Make " + nf.format(n.crafts);
-		if (n.fromStock() + n.fromSurplus > 0)
-		{
-			make = "Use " + nf.format(n.fromStock() + n.fromSurplus) + ", " + make.substring(0, 1).toLowerCase() + make.substring(1);
-		}
+			? "make " + Theme.n(n.crafts * out) + " (" + Theme.n(n.crafts) + " actions)"
+			: "make " + Theme.n(n.crafts);
+		String text = n.fromStock() + n.fromSurplus > 0
+			? "Use " + Theme.n(n.fromStock() + n.fromSurplus) + ", " + make
+			: Character.toUpperCase(make.charAt(0)) + make.substring(1);
 		if (n.via.facility != null && !n.via.facility.isEmpty())
 		{
-			make += " · " + n.via.facility;
+			text += " · " + n.via.facility;
 		}
-		return make;
+		return text;
 	}
 
 	private String priceSuffix(String name, long qty)
@@ -831,22 +982,17 @@ class RecipeTab extends JPanel
 			return "";
 		}
 		long p = icons.price(name);
-		return p > 0 ? " (≈" + shortGp(p * qty) + ")" : "";
+		return p > 0 ? " (~" + Theme.gp(p * qty) + " gp)" : "";
 	}
 
-	private String locationTooltip(Counts c)
+	private javax.swing.ImageIcon iconFor(String name, Component repaintTarget)
 	{
-		NumberFormat nf = NumberFormat.getIntegerInstance();
-		StringBuilder sb = new StringBuilder("<html>");
-		if (c.asMap().isEmpty())
+		int id = store.idForName(name);
+		if (id <= 0)
 		{
-			sb.append("None owned");
+			id = icons.idForName(name);
 		}
-		for (Map.Entry<Location, Long> e : c.asMap().entrySet())
-		{
-			sb.append(escape(store.label(e.getKey()))).append(": ").append(nf.format(e.getValue())).append("<br>");
-		}
-		return sb.append("</html>").toString();
+		return id > 0 ? icons.get(id, repaintTarget) : null;
 	}
 
 	/**
@@ -878,13 +1024,9 @@ class RecipeTab extends JPanel
 				{
 					return;
 				}
-				JPopupMenu menu = new JPopupMenu();
-				JMenuItem title = new JMenuItem("Make " + n.name + " with:");
-				title.setEnabled(false);
-				menu.add(title);
-
+				JPopupMenu menu = Kit.popup();
+				menu.add(Kit.menuTitle("Make " + n.name + " with:"));
 				String current = methods.get(n.key);
-				ButtonGroup group = new ButtonGroup();
 				for (Recipe alt : n.alternatives)
 				{
 					String label = alt.materialsText();
@@ -896,24 +1038,17 @@ class RecipeTab extends JPanel
 					{
 						label += " (" + alt.facility + ")";
 					}
-					if (label.length() > 70)
-					{
-						label = label.substring(0, 67) + "…";
-					}
-					JRadioButtonMenuItem item = new JRadioButtonMenuItem(label, n.via == alt);
+					javax.swing.JMenuItem item = Kit.menuItem(label, n.via == alt);
 					item.addActionListener(ev -> setMethod(n.key, alt.key()));
-					group.add(item);
 					menu.add(item);
 				}
-				menu.addSeparator();
-				JRadioButtonMenuItem none = new JRadioButtonMenuItem("Don't craft it (I'll gather or buy it)",
-					Planner.NO_MAKE.equals(current));
+				menu.add(Kit.separator());
+				javax.swing.JMenuItem none = Kit.menuItem("Don't craft it (I'll gather or buy it)", Planner.NO_MAKE.equals(current));
 				none.addActionListener(ev -> setMethod(n.key, Planner.NO_MAKE));
-				group.add(none);
 				menu.add(none);
 				if (current != null)
 				{
-					JMenuItem reset = new JMenuItem("Reset to default");
+					javax.swing.JMenuItem reset = Kit.menuItem("Reset to default", false);
 					reset.addActionListener(ev -> setMethod(n.key, null));
 					menu.add(reset);
 				}
@@ -933,19 +1068,27 @@ class RecipeTab extends JPanel
 			methods.put(materialKey, recipeKey);
 		}
 		configManager.setConfiguration(MaterialPlannerConfig.GROUP, KEY_METHODS, gson.toJson(methods, METHODS_TYPE));
-		refreshMaterials();
+		rebuild();
 	}
 
-	// --- persistence -----------------------------------------------------------------------------
+	/**
+	 * Items changed (bank opened, inventory moved): redraw the plan.
+	 */
+	void refreshMaterials()
+	{
+		rebuild();
+	}
+
+	// =================================================================================================
+	// Persistence
 
 	private void saveSelection()
 	{
 		List<SavedSelection> out = new ArrayList<>();
 		for (Selection s : selections)
 		{
-			out.add(new SavedSelection(s.recipe.key(), s.quantity));
+			out.add(new SavedSelection(s.recipe.key(), s.quantity, s.targetLevel));
 		}
-		// Recipes still waiting on the wiki download stay saved
 		if (pendingRestore != null)
 		{
 			out.addAll(pendingRestore);
@@ -990,158 +1133,237 @@ class RecipeTab extends JPanel
 		return new HashMap<>();
 	}
 
-	// --- small UI helpers ------------------------------------------------------------------------
+	// =================================================================================================
+	// Small pieces
+
+	static JPanel column()
+	{
+		JPanel p = new JPanel();
+		p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
+		p.setOpaque(false);
+		return p;
+	}
 
 	/**
-	 * For containers whose contents change later: align left but never cap the height.
+	 * Left-aligned and allowed to stretch to the full width, keeping its own height.
 	 */
-	private static <T extends JComponent> T leftAlign(T c)
+	static <T extends JComponent> T stretch(T c)
 	{
 		c.setAlignmentX(Component.LEFT_ALIGNMENT);
+		if (!(c instanceof MaterialRow) && !(c instanceof Kit.SectionHeader) && !(c instanceof Kit.SearchField)
+			&& !(c instanceof Kit.Dropdown))
+		{
+			c.setMaximumSize(new Dimension(Integer.MAX_VALUE, Integer.MAX_VALUE));
+		}
 		return c;
 	}
 
 	/**
-	 * For fixed rows: stretch to full width, keep the row's own height.
+	 * Proportional bar of ready / to make / short.
 	 */
-	private static <T extends JComponent> T fullWidth(T c)
+	private static final class StackBar extends JComponent
 	{
-		c.setAlignmentX(Component.LEFT_ALIGNMENT);
-		c.setMaximumSize(new Dimension(Integer.MAX_VALUE, c.getPreferredSize().height));
-		return c;
-	}
+		private final int ready;
+		private final int make;
+		private final int shortCount;
 
-	private static JLabel sectionHeader(String text)
-	{
-		JLabel l = new JLabel(text);
-		l.setFont(FontManager.getRunescapeSmallFont());
-		l.setForeground(Palette.MUTED);
-		l.setBorder(new EmptyBorder(2, 0, 6, 0));
-		return l;
-	}
-
-	private static JLabel smallLine(String text, Color color)
-	{
-		JLabel l = new JLabel(text);
-		l.setFont(FontManager.getRunescapeSmallFont());
-		l.setForeground(color);
-		return l;
-	}
-
-	private static JLabel hint(String text)
-	{
-		JLabel l = new JLabel("<html><body style='width:" + TEXT_WIDTH + "px'>" + escape(text) + "</body></html>");
-		l.setFont(FontManager.getRunescapeSmallFont());
-		l.setForeground(Palette.FAINT);
-		l.setBorder(new EmptyBorder(6, 0, 4, 0));
-		return l;
-	}
-
-	private static JButton smallButton(String text, String tooltip)
-	{
-		JButton b = new JButton(text);
-		b.setToolTipText(tooltip);
-		b.setFocusable(false);
-		b.setMargin(new java.awt.Insets(0, 4, 0, 4));
-		b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-		return b;
-	}
-
-	static String shortGp(long v)
-	{
-		if (v >= 10_000_000)
+		StackBar(int ready, int make, int shortCount)
 		{
-			return String.format("%.1fM", v / 1_000_000.0);
-		}
-		if (v >= 100_000)
-		{
-			return (v / 1000) + "k";
-		}
-		return NumberFormat.getIntegerInstance().format(v);
-	}
-
-	static String escape(String s)
-	{
-		return s == null ? "" : s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-	}
-
-	static String hex(Color c)
-	{
-		return String.format("#%02x%02x%02x", c.getRed(), c.getGreen(), c.getBlue());
-	}
-
-	/**
-	 * Two plain labels instead of HTML: HTML cells are slow to measure and would stall the client
-	 * when a whole skill's worth of recipes is listed.
-	 */
-	private final class SuggestionRenderer extends JPanel implements ListCellRenderer<Recipe>
-	{
-		private final JLabel title = new JLabel();
-		private final JLabel subtitle = new JLabel();
-
-		SuggestionRenderer()
-		{
-			setLayout(new BorderLayout());
-			setBorder(new EmptyBorder(3, 6, 3, 6));
-			title.setFont(FontManager.getRunescapeSmallFont());
-			subtitle.setFont(FontManager.getRunescapeSmallFont());
-			add(title, BorderLayout.NORTH);
-			add(subtitle, BorderLayout.SOUTH);
+			this.ready = ready;
+			this.make = make;
+			this.shortCount = shortCount;
+			setOpaque(false);
 		}
 
 		@Override
-		public Component getListCellRendererComponent(JList<? extends Recipe> list, Recipe r, int index,
+		public Dimension getPreferredSize()
+		{
+			return new Dimension(100, 8);
+		}
+
+		@Override
+		public Dimension getMaximumSize()
+		{
+			return new Dimension(Integer.MAX_VALUE, 8);
+		}
+
+		@Override
+		protected void paintComponent(Graphics g)
+		{
+			Graphics2D g2 = Theme.smooth(g);
+			int w = getWidth();
+			int h = getHeight();
+			RoundRectangle2D clip = new RoundRectangle2D.Double(0, 0, w, h, h, h);
+			g2.setColor(Theme.INSET);
+			g2.fill(clip);
+			int total = ready + make + shortCount;
+			if (total > 0)
+			{
+				g2.setClip(clip);
+				int x = 0;
+				int[] counts = {ready, make, shortCount};
+				Color[] colors = {Theme.OK, Theme.MAKE, Theme.BAD};
+				for (int i = 0; i < 3; i++)
+				{
+					int segW = i == 2 ? w - x : (int) Math.round((double) w * counts[i] / total);
+					if (counts[i] > 0 && segW > 0)
+					{
+						g2.setColor(colors[i]);
+						g2.fillRect(x, 0, segW, h);
+						x += segW;
+						if (x < w)
+						{
+							g2.setColor(Theme.CARD);
+							g2.fillRect(x, 0, 1, h);
+							x += 1;
+						}
+					}
+				}
+			}
+			g2.dispose();
+		}
+	}
+
+	/**
+	 * Dot-and-count legend for ready / to make / short, shortened to fit.
+	 */
+	private static final class Legend extends JComponent
+	{
+		private final int[] counts;
+		private static final String[] LABELS = {"ready", "to make", "short"};
+		private static final Color[] COLORS = {Theme.OK, Theme.MAKE, Theme.BAD};
+
+		Legend(int ready, int make, int shortCount)
+		{
+			counts = new int[]{ready, make, shortCount};
+			setOpaque(false);
+		}
+
+		@Override
+		public Dimension getPreferredSize()
+		{
+			return new Dimension(100, getFontMetrics(Theme.small()).getHeight());
+		}
+
+		@Override
+		public Dimension getMaximumSize()
+		{
+			return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+		}
+
+		@Override
+		protected void paintComponent(Graphics g)
+		{
+			Graphics2D g2 = Theme.smooth(g);
+			g2.setFont(Theme.small());
+			FontMetrics fm = g2.getFontMetrics();
+			int x = 0;
+			int base = fm.getAscent();
+			for (int i = 0; i < 3; i++)
+			{
+				if (counts[i] == 0)
+				{
+					continue;
+				}
+				String s = counts[i] + " " + LABELS[i];
+				int need = 12 + fm.stringWidth(s);
+				if (x + need > getWidth())
+				{
+					break;
+				}
+				Icons.DOT.paint(g2, x - 2, (fm.getHeight() - 14) / 2, 14, COLORS[i]);
+				g2.setColor(Theme.TEXT);
+				g2.drawString(s, x + 10, base);
+				x += need + 10;
+			}
+			g2.dispose();
+		}
+	}
+
+	/**
+	 * One tool: dot, name, and where it is, on one line.
+	 */
+	private static final class ToolRow extends JComponent
+	{
+		private final String name;
+		private final String state;
+		private final Color color;
+
+		ToolRow(String name, String state, Color color)
+		{
+			this.name = name;
+			this.state = state;
+			this.color = color;
+			setOpaque(false);
+		}
+
+		@Override
+		public Dimension getPreferredSize()
+		{
+			return new Dimension(100, getFontMetrics(Theme.small()).getHeight() + 6);
+		}
+
+		@Override
+		public Dimension getMaximumSize()
+		{
+			return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+		}
+
+		@Override
+		protected void paintComponent(Graphics g)
+		{
+			Graphics2D g2 = Theme.smooth(g);
+			g2.setFont(Theme.small());
+			FontMetrics fm = g2.getFontMetrics();
+			int base = (getHeight() - fm.getHeight()) / 2 + fm.getAscent();
+			Icons.DOT.paint(g2, -3, (getHeight() - 14) / 2, 14, color);
+			int sw = fm.stringWidth(state);
+			g2.setColor(color);
+			g2.drawString(state, getWidth() - sw, base);
+			g2.setColor(Theme.TEXT);
+			g2.drawString(Theme.fit(name, fm, getWidth() - sw - 22), 12, base);
+			g2.dispose();
+		}
+	}
+
+	/**
+	 * Painted suggestion row: name, then requirements (or what blocks it, in red).
+	 */
+	private final class SuggestionRenderer extends JComponent implements ListCellRenderer<Recipe>
+	{
+		private Recipe recipe;
+		private boolean selected;
+		private List<String> blocked = new ArrayList<>();
+
+		@Override
+		public Component getListCellRendererComponent(JList<? extends Recipe> list, Recipe value, int index,
 			boolean isSelected, boolean cellHasFocus)
 		{
-			boolean unmet = !unmetLevels(r).isEmpty();
-			title.setText(r.toString());
-			title.setForeground(unmet ? Palette.FAINT : Palette.TEXT);
-			subtitle.setText(r.subtitle());
-			subtitle.setForeground(unmet ? RED : Palette.MUTED);
-			setBackground(isSelected ? Palette.ROW_SELECTED : Palette.ROW);
+			recipe = value;
+			selected = isSelected;
+			blocked = blockers(value);
 			return this;
 		}
-	}
-
-	/**
-	 * Scroll content that always matches the visible width, so rows wrap or shrink instead of
-	 * extending past the right edge where they'd be clipped.
-	 */
-	private static final class WidthTrackingPanel extends JPanel implements Scrollable
-	{
-		WidthTrackingPanel(java.awt.LayoutManager layout)
-		{
-			super(layout);
-		}
 
 		@Override
-		public Dimension getPreferredScrollableViewportSize()
+		protected void paintComponent(Graphics g)
 		{
-			return getPreferredSize();
-		}
-
-		@Override
-		public int getScrollableUnitIncrement(java.awt.Rectangle visibleRect, int orientation, int direction)
-		{
-			return 16;
-		}
-
-		@Override
-		public int getScrollableBlockIncrement(java.awt.Rectangle visibleRect, int orientation, int direction)
-		{
-			return Math.max(visibleRect.height - 16, 16);
-		}
-
-		@Override
-		public boolean getScrollableTracksViewportWidth()
-		{
-			return true;
-		}
-
-		@Override
-		public boolean getScrollableTracksViewportHeight()
-		{
-			return false;
+			Graphics2D g2 = Theme.smooth(g);
+			if (selected)
+			{
+				g2.setColor(Theme.CARD_HOVER);
+				g2.fill(new RoundRectangle2D.Double(0, 1, getWidth(), getHeight() - 2, 6, 6));
+			}
+			g2.setFont(Theme.small());
+			FontMetrics fm = g2.getFontMetrics();
+			int w = getWidth() - 12;
+			int y1 = (getHeight() - fm.getHeight() * 2) / 2 + fm.getAscent();
+			g2.setColor(blocked.isEmpty() ? Theme.TEXT : Theme.FAINT);
+			g2.drawString(Theme.fit(recipe.toString(), fm, w), 6, y1);
+			String sub = blocked.isEmpty() ? recipe.subtitle() : "Needs " + String.join(", ", blocked);
+			g2.setColor(blocked.isEmpty() ? Theme.MUTED : Theme.BAD);
+			g2.drawString(Theme.fit(sub, fm, w), 6, y1 + fm.getHeight());
+			g2.dispose();
 		}
 	}
 }

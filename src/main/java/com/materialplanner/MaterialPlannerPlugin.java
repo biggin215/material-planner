@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -35,6 +36,9 @@ import net.runelite.api.ItemComposition;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.MenuAction;
 import net.runelite.api.MenuEntry;
+import net.runelite.api.Quest;
+import net.runelite.api.QuestState;
+import net.runelite.api.WorldType;
 import net.runelite.api.Skill;
 import net.runelite.api.events.GameStateChanged;
 import net.runelite.api.events.GameTick;
@@ -60,6 +64,7 @@ import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.util.Filepath;
 import net.runelite.client.util.ImageUtil;
 import net.runelite.client.util.Text;
+import net.runelite.http.api.item.ItemPrice;
 import okhttp3.OkHttpClient;
 
 @Slf4j
@@ -86,7 +91,15 @@ public class MaterialPlannerPlugin extends Plugin implements PanelHost
 		CONTAINERS.put(InventoryID.SEED_BOX, Location.SEED_BOX);
 		CONTAINERS.put(InventoryID.LOOTING_BAG, Location.LOOTING_BAG);
 		CONTAINERS.put(InventoryID.INV_GROUP_TEMP, Location.GROUP_STORAGE);
+		CONTAINERS.put(InventoryID.TACKLE_BOX, Location.TACKLE_BOX);
+		CONTAINERS.put(InventoryID.FORESTRY_KIT, Location.FORESTRY_KIT);
+		CONTAINERS.put(InventoryID.HUNTSMANS_KIT, Location.HUNTSMANS_KIT);
 	}
+
+	/** Re-read quest progress this often (game ticks); the check runs a client script per quest. */
+	private static final int QUEST_REFRESH_TICKS = 100;
+	/** Redraw for XP changes at most this often, so level goals keep up without redrawing every xp drop. */
+	private static final int XP_REFRESH_TICKS = 10;
 
 	private static final int[] POUCH_TYPE_VARBITS = {
 		VarbitID.RUNE_POUCH_TYPE_1, VarbitID.RUNE_POUCH_TYPE_2, VarbitID.RUNE_POUCH_TYPE_3,
@@ -148,6 +161,16 @@ public class MaterialPlannerPlugin extends Plugin implements PanelHost
 	private NavigationButton navButton;
 
 	private final Map<String, Integer> levels = new ConcurrentHashMap<>();
+	private final Map<String, Long> xp = new ConcurrentHashMap<>();
+	/** Lower-cased quest name → state. Empty until logged in. */
+	private final Map<String, QuestState> questStates = new ConcurrentHashMap<>();
+	private final Map<String, List<String>> unmetQuestCache = new ConcurrentHashMap<>();
+	/** Normalized item name → stacks in one slot. */
+	private final Map<String, Boolean> stackables = new ConcurrentHashMap<>();
+	private final Set<String> stackLookups = ConcurrentHashMap.newKeySet();
+	private volatile Boolean membersWorld;
+	private volatile boolean xpDirty;
+	private int tickCount;
 	/** Boat name of the cargo hold window currently open, or null when it's closed. */
 	private String openCargoBoat;
 	private String lastCargoSignature;
@@ -205,7 +228,17 @@ public class MaterialPlannerPlugin extends Plugin implements PanelHost
 		panel = null;
 		store = null;
 		recipes = null;
+		clearAccountState();
+	}
+
+	private void clearAccountState()
+	{
 		levels.clear();
+		xp.clear();
+		questStates.clear();
+		unmetQuestCache.clear();
+		membersWorld = null;
+		ironman = false;
 	}
 
 	/**
@@ -224,8 +257,11 @@ public class MaterialPlannerPlugin extends Plugin implements PanelHost
 		for (Skill s : Skill.values())
 		{
 			levels.put(s.getName().toLowerCase(Locale.ROOT), client.getRealSkillLevel(s));
+			xp.put(s.getName().toLowerCase(Locale.ROOT), (long) client.getSkillExperience(s));
 		}
 		ironman = client.getVarbitValue(VarbitID.IRONMAN) > 0;
+		membersWorld = client.getWorldType().contains(WorldType.MEMBERS);
+		refreshQuests();
 		updateRunePouch();
 		refreshPanelSettings();
 	}
@@ -253,10 +289,20 @@ public class MaterialPlannerPlugin extends Plugin implements PanelHost
 		}
 	}
 
+	private final java.util.concurrent.atomic.AtomicBoolean refreshQueued = new java.util.concurrent.atomic.AtomicBoolean();
+
+	/**
+	 * Redraw the panel. Bursts of calls (e.g. many item lookups finishing at once) collapse into one redraw.
+	 */
 	private void refreshPanelSettings()
 	{
+		if (!refreshQueued.compareAndSet(false, true))
+		{
+			return;
+		}
 		SwingUtilities.invokeLater(() ->
 		{
+			refreshQueued.set(false);
 			if (panel != null)
 			{
 				panel.onSettingsChanged();
@@ -334,11 +380,13 @@ public class MaterialPlannerPlugin extends Plugin implements PanelHost
 				continue;
 			}
 			int canonical = itemManager.canonicalize(itemId);
-			String name = itemManager.getItemComposition(canonical).getName();
+			ItemComposition canonicalComp = itemManager.getItemComposition(canonical);
+			String name = canonicalComp.getName();
 			if (name == null || name.equals("null") || name.equals(BANK_FILLER))
 			{
 				continue;
 			}
+			stackables.putIfAbsent(ItemStore.normalize(name), canonicalComp.isStackable());
 			out.add(new StoredItem(canonical, name, qty));
 		}
 		return out;
@@ -403,6 +451,44 @@ public class MaterialPlannerPlugin extends Plugin implements PanelHost
 	 */
 	@Subscribe
 	public void onGameTick(GameTick event)
+	{
+		tickCount++;
+		if (tickCount % QUEST_REFRESH_TICKS == 0)
+		{
+			refreshQuests();
+		}
+		if (xpDirty && tickCount % XP_REFRESH_TICKS == 0)
+		{
+			xpDirty = false;
+			refreshPanelSettings();
+		}
+		readCargoHold();
+	}
+
+	/**
+	 * Client thread.
+	 */
+	private void refreshQuests()
+	{
+		if (client.getGameState() != GameState.LOGGED_IN)
+		{
+			return;
+		}
+		boolean changed = false;
+		for (Quest q : Quest.values())
+		{
+			QuestState s = q.getState(client);
+			QuestState prev = questStates.put(q.getName().toLowerCase(Locale.ROOT), s);
+			changed |= prev != s;
+		}
+		if (changed)
+		{
+			unmetQuestCache.clear();
+			refreshPanelSettings();
+		}
+	}
+
+	private void readCargoHold()
 	{
 		Widget itemsWidget = client.getWidget(InterfaceID.SailingBoatCargohold.ITEMS);
 		if (itemsWidget == null || itemsWidget.isHidden())
@@ -509,6 +595,11 @@ public class MaterialPlannerPlugin extends Plugin implements PanelHost
 	public void onStatChanged(StatChanged event)
 	{
 		String key = event.getSkill().getName().toLowerCase(Locale.ROOT);
+		Long prevXp = xp.put(key, (long) event.getXp());
+		if (prevXp == null || prevXp != event.getXp())
+		{
+			xpDirty = true;
+		}
 		Integer prev = levels.put(key, event.getLevel());
 		// Fires on every xp drop; only redraw when a level actually changes
 		if (prev == null || prev != event.getLevel())
@@ -529,8 +620,7 @@ public class MaterialPlannerPlugin extends Plugin implements PanelHost
 		if (event.getGameState() == GameState.LOGIN_SCREEN)
 		{
 			store.clearLive();
-			levels.clear();
-			ironman = false;
+			clearAccountState();
 			refreshPanelSettings();
 		}
 		else if (event.getGameState() == GameState.LOGGED_IN)
@@ -572,6 +662,97 @@ public class MaterialPlannerPlugin extends Plugin implements PanelHost
 			key = "runecraft";
 		}
 		return levels.getOrDefault(key, -1);
+	}
+
+	@Override
+	public long skillXp(String skill)
+	{
+		if (skill == null)
+		{
+			return -1;
+		}
+		String key = skill.toLowerCase(Locale.ROOT);
+		if (key.equals("runecrafting"))
+		{
+			key = "runecraft";
+		}
+		return xp.getOrDefault(key, -1L);
+	}
+
+	@Override
+	public Boolean membersWorld()
+	{
+		return membersWorld;
+	}
+
+	@Override
+	public boolean ironman()
+	{
+		return ironman;
+	}
+
+	@Override
+	public List<String> unmetQuests(String requirementText)
+	{
+		if (requirementText == null || requirementText.isEmpty() || questStates.isEmpty())
+		{
+			return Collections.emptyList();
+		}
+		return unmetQuestCache.computeIfAbsent(requirementText, text ->
+		{
+			String lower = text.toLowerCase(Locale.ROOT);
+			// "Partial completion of X" / "started X" only needs the quest begun
+			boolean partial = lower.contains("partial") || lower.contains("started") || lower.contains("during");
+			List<String> unmet = new ArrayList<>();
+			for (Quest q : Quest.values())
+			{
+				String name = q.getName().toLowerCase(Locale.ROOT);
+				if (!lower.contains(name))
+				{
+					continue;
+				}
+				QuestState s = questStates.get(name);
+				boolean met = s == QuestState.FINISHED || (partial && s == QuestState.IN_PROGRESS);
+				if (s != null && !met)
+				{
+					unmet.add(q.getName());
+				}
+			}
+			return unmet;
+		});
+	}
+
+	@Override
+	public Boolean stackable(String itemName)
+	{
+		String key = ItemStore.normalize(itemName);
+		Boolean known = stackables.get(key);
+		if (known != null || !stackLookups.add(key))
+		{
+			return known;
+		}
+		// Not seen in any container yet: look the item up by name, then read its definition on the client thread
+		int id = -1;
+		for (ItemPrice p : itemManager.search(itemName))
+		{
+			if (p.getName().equalsIgnoreCase(itemName))
+			{
+				id = p.getId();
+				break;
+			}
+		}
+		if (id <= 0)
+		{
+			stackables.put(key, false);
+			return false;
+		}
+		final int itemId = id;
+		clientThread.invokeLater(() ->
+		{
+			stackables.put(key, itemManager.getItemComposition(itemId).isStackable());
+			refreshPanelSettings();
+		});
+		return null;
 	}
 
 	@Override

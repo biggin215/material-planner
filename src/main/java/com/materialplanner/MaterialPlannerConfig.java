@@ -115,7 +115,7 @@ public interface MaterialPlannerConfig extends Config
 	@ConfigItem(
 		keyName = "countOtherStorage",
 		name = "Count other storage",
-		description = "Count the seed vault, cargo holds, looting bag, seed box and group storage as available",
+		description = "Count the seed vault, cargo holds, tackle box, forestry and huntsman's kits, looting bag, seed box and group storage as available",
 		position = 2,
 		section = storageSection
 	)
@@ -140,8 +140,8 @@ public interface MaterialPlannerConfig extends Config
 
 	@ConfigItem(
 		keyName = "wikiRecipes",
-		name = "Download wiki recipes",
-		description = "Download the full recipe list from the OSRS Wiki. When off, only the built-in recipes are available.",
+		name = "Download wiki data",
+		description = "Download the full recipe list and shop stock from the OSRS Wiki. When off, only the built-in recipes are available.",
 		position = 1,
 		section = dataSection
 	)
@@ -154,7 +154,7 @@ public interface MaterialPlannerConfig extends Config
 	@ConfigItem(
 		keyName = "refreshDays",
 		name = "Recipe refresh (days)",
-		description = "How often to re-download recipes from the wiki",
+		description = "How often to re-download recipes and shops from the wiki",
 		position = 2,
 		section = dataSection
 	)

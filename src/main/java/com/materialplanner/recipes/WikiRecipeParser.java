@@ -23,6 +23,14 @@ final class WikiRecipeParser
 
 	static Recipe parse(JsonElement productionJson, String pageName)
 	{
+		return parse(productionJson, pageName, null);
+	}
+
+	/**
+	 * @param membersField the row's is_members_only value, which is more reliable than the JSON's own flag
+	 */
+	static Recipe parse(JsonElement productionJson, String pageName, JsonElement membersField)
+	{
 		JsonObject o = asObject(productionJson);
 		if (o == null)
 		{
@@ -79,15 +87,83 @@ final class WikiRecipeParser
 			String name = str(so.get("name"));
 			if (name != null && !name.isEmpty())
 			{
-				r.skills.add(new Recipe.SkillReq(capitalize(name), num(so.get("level"), 0)));
+				double xp = firstNumber(so, "experience", "exp", "xp");
+				r.skills.add(new Recipe.SkillReq(capitalize(WikiText.clean(name)), num(so.get("level"), 0), xp));
 			}
 		}
 
-		r.facility = joinish(o.get("facilities"));
-		r.tools = joinish(o.get("tools"));
-		String members = str(o.get("members"));
-		r.members = members == null || !members.equalsIgnoreCase("no");
+		String facility = WikiText.clean(joinish(firstPresent(o, "facilities", "facility")));
+		r.facility = facility == null || facility.isEmpty() ? null : facility;
+
+		String rawTools = joinish(o.get("tools"));
+		r.toolReqs = WikiText.toolRequirements(rawTools);
+		StringBuilder tools = new StringBuilder();
+		for (java.util.List<String> alts : r.toolReqs)
+		{
+			if (tools.length() > 0)
+			{
+				tools.append(", ");
+			}
+			tools.append(String.join(" or ", alts));
+		}
+		r.tools = tools.length() == 0 ? null : tools.toString();
+
+		String quest = WikiText.clean(joinish(firstPresent(o, "quest", "quests", "notes")));
+		r.quest = quest == null || quest.isEmpty() ? null : quest;
+
+		r.members = parseMembers(membersField != null ? membersField : o.get("members"));
 		return r;
+	}
+
+	static boolean parseMembers(JsonElement e)
+	{
+		String s = str(e);
+		if (s == null)
+		{
+			// Unknown: assume members so free-to-play players aren't promised something they can't do
+			return true;
+		}
+		s = s.trim().toLowerCase();
+		return !(s.equals("no") || s.equals("false") || s.equals("0") || s.equals("f2p"));
+	}
+
+	private static JsonElement firstPresent(JsonObject o, String... keys)
+	{
+		for (String k : keys)
+		{
+			JsonElement e = o.get(k);
+			if (e != null && !e.isJsonNull())
+			{
+				return e;
+			}
+		}
+		return null;
+	}
+
+	private static final Pattern DECIMAL = Pattern.compile("(\\d[\\d,]*(?:\\.\\d+)?)");
+
+	static double firstNumber(JsonObject o, String... keys)
+	{
+		for (String k : keys)
+		{
+			String s = str(o.get(k));
+			if (s == null)
+			{
+				continue;
+			}
+			Matcher m = DECIMAL.matcher(s);
+			if (m.find())
+			{
+				try
+				{
+					return Double.parseDouble(m.group(1).replace(",", ""));
+				}
+				catch (NumberFormatException ignored)
+				{
+				}
+			}
+		}
+		return 0;
 	}
 
 	private static JsonObject asObject(JsonElement e)

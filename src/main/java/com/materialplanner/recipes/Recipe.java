@@ -30,6 +30,8 @@ public class Recipe
 	{
 		public String name;
 		public int level;
+		/** XP gained per action, 0 when the wiki has none. */
+		public double experience;
 
 		public SkillReq()
 		{
@@ -40,6 +42,12 @@ public class Recipe
 			this.name = name;
 			this.level = level;
 		}
+
+		public SkillReq(String name, int level, double experience)
+		{
+			this(name, level);
+			this.experience = experience;
+		}
 	}
 
 	public String name;
@@ -47,7 +55,12 @@ public class Recipe
 	public List<SkillReq> skills = new ArrayList<>();
 	public List<Material> materials = new ArrayList<>();
 	public String facility;
+	/** Tools as shown to the player, e.g. "Saw, Hammer". */
 	public String tools;
+	/** Each required tool, as a list of acceptable alternatives. */
+	public List<List<String>> toolReqs = new ArrayList<>();
+	/** Quest or other unlock text from the wiki, or null. */
+	public String quest;
 	public boolean members;
 	public String source;
 
@@ -111,6 +124,21 @@ public class Recipe
 			sb.append('|').append(m.name).append('x').append(m.quantity);
 		}
 		return sb.toString();
+	}
+
+	/**
+	 * The skill this recipe trains, for level goals: the first skill that gives XP.
+	 */
+	public SkillReq xpSkill()
+	{
+		for (SkillReq s : skills)
+		{
+			if (s.experience > 0)
+			{
+				return s;
+			}
+		}
+		return null;
 	}
 
 	public boolean usesSkill(String skill)

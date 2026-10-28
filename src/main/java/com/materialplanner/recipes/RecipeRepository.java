@@ -43,7 +43,13 @@ public class RecipeRepository
 	private static final String USER_AGENT = "RuneLite Material Planner plugin";
 	private static final int PAGE_SIZE = 500;
 	private static final int MAX_ROWS = 40_000;
-	private static final String CACHE_NAME = "recipes.json";
+	// v2: adds XP, cleaned tools/facilities, quest text and the real members flag
+	private static final String CACHE_NAME = "recipes-v2.json";
+	private static final String SHOP_CACHE_NAME = "shops-v1.json";
+	private static final int MAX_SHOP_ROWS = 60_000;
+	private static final Type SHOP_LIST_TYPE = new TypeToken<List<ShopSource>>()
+	{
+	}.getType();
 	private static final Type LIST_TYPE = new TypeToken<List<Recipe>>()
 	{
 	}.getType();
@@ -70,6 +76,8 @@ public class RecipeRepository
 	private volatile List<Recipe> recipes = Collections.emptyList();
 	private volatile List<String> skills = Collections.emptyList();
 	private volatile Map<String, List<Recipe>> byOutput = Collections.emptyMap();
+	private volatile Map<String, List<ShopSource>> shops = Collections.emptyMap();
+	private volatile int xpRecipeCount;
 	private volatile String status = "Loading recipes…";
 
 	/**
@@ -93,6 +101,22 @@ public class RecipeRepository
 	public Map<String, List<Recipe>> getByOutput()
 	{
 		return byOutput;
+	}
+
+	/**
+	 * Shops selling an item, cheapest coin price first. Empty when unknown.
+	 */
+	public List<ShopSource> getShops(String itemName)
+	{
+		return shops.getOrDefault(Planner.normalize(itemName), Collections.emptyList());
+	}
+
+	/**
+	 * How many recipes have XP data, which level goals rely on.
+	 */
+	public int getXpRecipeCount()
+	{
+		return xpRecipeCount;
 	}
 
 	public List<String> getSkills()
@@ -148,6 +172,7 @@ public class RecipeRepository
 			{
 				wiki = cached;
 			}
+			loadShops(stale);
 		}
 
 		// Built-in boat-part recipes are labelled per boat; drop the wiki's unlabelled copies of them
@@ -185,6 +210,15 @@ public class RecipeRepository
 			}
 		}
 
+		int withXp = 0;
+		for (Recipe r : all)
+		{
+			if (r.xpSkill() != null)
+			{
+				withXp++;
+			}
+		}
+		xpRecipeCount = withXp;
 		byOutput = Planner.indexByOutput(all);
 		recipes = Collections.unmodifiableList(all);
 		skills = Collections.unmodifiableList(new ArrayList<>(skillSet));
@@ -258,7 +292,12 @@ public class RecipeRepository
 
 	private Filepath cacheFile()
 	{
-		return cacheDir == null ? null : cacheDir.join(CACHE_NAME);
+		return cacheFile(CACHE_NAME);
+	}
+
+	private Filepath cacheFile(String name)
+	{
+		return cacheDir == null ? null : cacheDir.join(name);
 	}
 
 	private long cacheModified()
@@ -294,7 +333,12 @@ public class RecipeRepository
 
 	private void writeCache(List<Recipe> list)
 	{
-		Filepath f = cacheFile();
+		writeJson(CACHE_NAME, list, LIST_TYPE);
+	}
+
+	private void writeJson(String name, Object value, Type type)
+	{
+		Filepath f = cacheFile(name);
 		if (f == null)
 		{
 			return;
@@ -303,17 +347,126 @@ public class RecipeRepository
 		{
 			cacheDir.createDirectories();
 			// Write to a temp file first so a crash mid-write can't leave a corrupt cache
-			Filepath tmp = cacheDir.join(CACHE_NAME + ".tmp");
+			Filepath tmp = cacheDir.join(name + ".tmp");
 			try (Writer w = tmp.openBufferedWriter())
 			{
-				gson.toJson(list, LIST_TYPE, w);
+				gson.toJson(value, type, w);
 			}
 			tmp.moveTo(f, StandardCopyOption.REPLACE_EXISTING);
 		}
 		catch (IOException e)
 		{
-			log.warn("Could not write recipe cache", e);
+			log.warn("Could not write {}", name, e);
 		}
+	}
+
+	// --- shops -----------------------------------------------------------------------------------
+
+	/**
+	 * Shop data is a nice-to-have: any failure leaves shop info empty and never affects recipes.
+	 */
+	private void loadShops(boolean refresh)
+	{
+		List<ShopSource> list = null;
+		Filepath f = cacheFile(SHOP_CACHE_NAME);
+		if (!refresh && f != null && f.exists())
+		{
+			try (Reader reader = f.openBufferedReader())
+			{
+				list = gson.fromJson(reader, SHOP_LIST_TYPE);
+			}
+			catch (IOException | RuntimeException e)
+			{
+				log.warn("Shop cache unreadable", e);
+			}
+		}
+		if (list == null)
+		{
+			try
+			{
+				status = "Downloading shop data from the OSRS Wiki…";
+				list = fetchShops();
+				if (!list.isEmpty())
+				{
+					writeJson(SHOP_CACHE_NAME, list, SHOP_LIST_TYPE);
+				}
+			}
+			catch (IOException | RuntimeException e)
+			{
+				log.warn("Wiki shop download failed", e);
+				return;
+			}
+		}
+		shops = indexShops(list);
+	}
+
+	static Map<String, List<ShopSource>> indexShops(List<ShopSource> list)
+	{
+		Map<String, List<ShopSource>> idx = new java.util.HashMap<>();
+		for (ShopSource s : list)
+		{
+			if (s.item != null && s.store != null)
+			{
+				idx.computeIfAbsent(Planner.normalize(s.item), k -> new ArrayList<>()).add(s);
+			}
+		}
+		// Coin shops first, then cheapest
+		java.util.Comparator<ShopSource> order = java.util.Comparator
+			.comparing((ShopSource s) -> !s.isCoins())
+			.thenComparingInt(s -> s.price < 0 ? Integer.MAX_VALUE : s.price);
+		for (List<ShopSource> l : idx.values())
+		{
+			l.sort(order);
+		}
+		return idx;
+	}
+
+	private List<ShopSource> fetchShops() throws IOException
+	{
+		List<ShopSource> out = new ArrayList<>();
+		for (int offset = 0; offset < MAX_SHOP_ROWS; offset += PAGE_SIZE)
+		{
+			String query = "bucket('storeline').select('sold_item','sold_by','store_sell_price','store_currency','store_stock')"
+				+ ".limit(" + PAGE_SIZE + ").offset(" + offset + ").run()";
+			JsonArray rows = queryBucket(query);
+			for (JsonElement row : rows)
+			{
+				if (!row.isJsonObject())
+				{
+					continue;
+				}
+				JsonObject ro = row.getAsJsonObject();
+				ShopSource s = new ShopSource();
+				s.item = WikiText.clean(text(ro.get("sold_item")));
+				s.store = WikiText.clean(text(ro.get("sold_by")));
+				s.currency = WikiText.clean(text(ro.get("store_currency")));
+				s.stock = WikiText.clean(text(ro.get("store_stock")));
+				s.price = WikiRecipeParser.num(ro.get("store_sell_price"), -1);
+				if (s.item != null && !s.item.isEmpty() && s.store != null && !s.store.isEmpty())
+				{
+					out.add(s);
+				}
+			}
+			if (rows.size() < PAGE_SIZE)
+			{
+				break;
+			}
+		}
+		return out;
+	}
+
+	private static String text(JsonElement e)
+	{
+		if (e == null || e.isJsonNull())
+		{
+			return null;
+		}
+		if (e.isJsonArray())
+		{
+			JsonArray a = e.getAsJsonArray();
+			return a.size() == 0 ? null : text(a.get(0));
+		}
+		return e.isJsonPrimitive() ? e.getAsString() : null;
 	}
 
 	/**
@@ -324,24 +477,9 @@ public class RecipeRepository
 		List<Recipe> out = new ArrayList<>();
 		for (int offset = 0; offset < MAX_ROWS; offset += PAGE_SIZE)
 		{
-			String query = "bucket('recipe').select('page_name','production_json')"
+			String query = "bucket('recipe').select('page_name','production_json','is_members_only')"
 				+ ".limit(" + PAGE_SIZE + ").offset(" + offset + ").run()";
-			String url = WIKI_API + "?action=bucket&format=json&query="
-				+ URLEncoder.encode(query, StandardCharsets.UTF_8.name());
-
-			Request req = new Request.Builder().url(url).header("User-Agent", USER_AGENT).build();
-			JsonArray rows;
-			try (Response resp = http.newCall(req).execute())
-			{
-				ResponseBody body = resp.body();
-				if (!resp.isSuccessful() || body == null)
-				{
-					throw new IOException("Wiki API returned HTTP " + resp.code());
-				}
-				@SuppressWarnings("deprecation")
-				JsonElement root = new JsonParser().parse(body.charStream());
-				rows = extractRows(root);
-			}
+			JsonArray rows = queryBucket(query);
 
 			for (JsonElement row : rows)
 			{
@@ -350,9 +488,8 @@ public class RecipeRepository
 					continue;
 				}
 				JsonObject ro = row.getAsJsonObject();
-				String page = ro.has("page_name") && ro.get("page_name").isJsonPrimitive()
-					? ro.get("page_name").getAsString() : null;
-				Recipe r = WikiRecipeParser.parse(ro.get("production_json"), page);
+				String page = text(ro.get("page_name"));
+				Recipe r = WikiRecipeParser.parse(ro.get("production_json"), page, ro.get("is_members_only"));
 				if (r != null)
 				{
 					out.add(r);
@@ -367,6 +504,24 @@ public class RecipeRepository
 		}
 		log.debug("Downloaded {} recipes from the wiki", out.size());
 		return out;
+	}
+
+	private JsonArray queryBucket(String query) throws IOException
+	{
+		String url = WIKI_API + "?action=bucket&format=json&query="
+			+ URLEncoder.encode(query, StandardCharsets.UTF_8.name());
+		Request req = new Request.Builder().url(url).header("User-Agent", USER_AGENT).build();
+		try (Response resp = http.newCall(req).execute())
+		{
+			ResponseBody body = resp.body();
+			if (!resp.isSuccessful() || body == null)
+			{
+				throw new IOException("Wiki API returned HTTP " + resp.code());
+			}
+			@SuppressWarnings("deprecation")
+			JsonElement root = new JsonParser().parse(body.charStream());
+			return extractRows(root);
+		}
 	}
 
 	/**

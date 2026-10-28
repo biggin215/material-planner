@@ -50,6 +50,28 @@ public final class Planner
 		public boolean includeOther = true;
 		/** normalized material name → recipe key to use, or NO_MAKE */
 		public Map<String, String> methods = new HashMap<>();
+		/** Whether an item stacks in one inventory slot, by display name. Null: only coins stack. */
+		public java.util.function.Predicate<String> stackable;
+	}
+
+	/**
+	 * A tool the plan needs at least once (not consumed). Any one of {@code alternatives} will do.
+	 */
+	public static final class ToolNeed
+	{
+		public final List<String> alternatives;
+		/** Recipes that need it, for the tooltip. */
+		public final List<String> usedBy = new ArrayList<>();
+
+		ToolNeed(List<String> alternatives)
+		{
+			this.alternatives = alternatives;
+		}
+
+		public String label()
+		{
+			return String.join(" or ", alternatives);
+		}
 	}
 
 	public static final class Node
@@ -134,6 +156,10 @@ public final class Planner
 		public final Map<String, Long> fromOther = new HashMap<>();
 		public long coinsNeeded;
 		public long coinsAvailable;
+		/** Every distinct tool the plan needs, in first-seen order. */
+		public final List<ToolNeed> tools = new ArrayList<>();
+		/** Inventory slots taken by materials you'll carry (stackables count once), plus tools. */
+		public int inventorySlots;
 		public int ready;
 		public int toMake;
 		public int shortCount;
@@ -198,10 +224,24 @@ public final class Planner
 			}
 		}
 
+		Map<String, ToolNeed> tools = new LinkedHashMap<>();
+		for (Recipe r : selections.keySet())
+		{
+			addTools(tools, r);
+		}
+		Map<String, Long> carry = new LinkedHashMap<>();
 		for (Node r : plan.roots)
 		{
 			p.collect(r, plan);
+			p.collectExtras(r, tools, carry);
 		}
+		plan.tools.addAll(tools.values());
+		int slots = 0;
+		for (Map.Entry<String, Long> e : carry.entrySet())
+		{
+			slots += p.isStackable(e.getKey()) ? 1 : (int) Math.min(Integer.MAX_VALUE, e.getValue());
+		}
+		plan.inventorySlots = slots + plan.tools.size();
 		Counts coins = stock.get("coins");
 		plan.coinsAvailable = coins == null ? 0 : coins.total(opt.includeWorn, opt.includeOther);
 		return plan;
@@ -339,7 +379,43 @@ public final class Planner
 				}
 			}
 		}
-		return candidates.isEmpty() ? null : candidates.get(0);
+		if (candidates.isEmpty())
+		{
+			return null;
+		}
+		// Prefer a method whose ingredients you can actually get: owned already, or craftable.
+		// Otherwise rare unlocks (sawmill coupons, vouchers) win just for being short recipes.
+		Recipe best = candidates.get(0);
+		int bestMissing = unobtainable(best);
+		for (Recipe r : candidates)
+		{
+			int m = unobtainable(r);
+			if (m < bestMissing)
+			{
+				best = r;
+				bestMissing = m;
+			}
+		}
+		return best;
+	}
+
+	/**
+	 * Ingredients of {@code r} you don't own any of and can't craft.
+	 */
+	private int unobtainable(Recipe r)
+	{
+		int missing = 0;
+		for (Recipe.Material m : r.materials)
+		{
+			String k = normalize(m.name);
+			Counts c = stock.get(k);
+			boolean owned = c != null && c.total(opt.includeWorn, opt.includeOther) > 0;
+			if (!owned && !byOutput.containsKey(k))
+			{
+				missing++;
+			}
+		}
+		return missing;
 	}
 
 	private void collect(Node n, Plan plan)
@@ -364,6 +440,57 @@ public final class Planner
 		{
 			collect(c, plan);
 		}
+	}
+
+	private void collectExtras(Node n, Map<String, ToolNeed> tools, Map<String, Long> carry)
+	{
+		long taken = n.fromStock();
+		if (taken > 0)
+		{
+			carry.merge(n.name, taken, Long::sum);
+		}
+		if (n.via != null)
+		{
+			addTools(tools, n.via);
+		}
+		for (Node c : n.children)
+		{
+			collectExtras(c, tools, carry);
+		}
+	}
+
+	private static void addTools(Map<String, ToolNeed> tools, Recipe r)
+	{
+		if (r.toolReqs == null)
+		{
+			return;
+		}
+		for (List<String> alts : r.toolReqs)
+		{
+			String key = normalize(String.join("|", alts));
+			ToolNeed t = tools.computeIfAbsent(key, k -> new ToolNeed(alts));
+			if (!t.usedBy.contains(r.displayName()))
+			{
+				t.usedBy.add(r.displayName());
+			}
+		}
+	}
+
+	private boolean isStackable(String name)
+	{
+		if ("coins".equals(normalize(name)))
+		{
+			return true;
+		}
+		return opt.stackable != null && opt.stackable.test(name);
+	}
+
+	/**
+	 * Inventories needed to carry {@code slots} items, 28 slots each.
+	 */
+	public static int inventories(int slots)
+	{
+		return slots <= 0 ? 0 : (slots + 27) / 28;
 	}
 
 	private static boolean containsMake(Node n)

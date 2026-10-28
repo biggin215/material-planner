@@ -9,7 +9,8 @@
    },
    {
     "name": "Construction",
-    "level": 1
+    "level": 1,
+    "experience": 20
    }
   ],
   "materials": [
@@ -39,7 +40,8 @@
    },
    {
     "name": "Construction",
-    "level": 11
+    "level": 11,
+    "experience": 28
    }
   ],
   "materials": [
@@ -69,7 +71,8 @@
    },
    {
     "name": "Construction",
-    "level": 26
+    "level": 26,
+    "experience": 41
    }
   ],
   "materials": [
@@ -99,7 +102,8 @@
    },
    {
     "name": "Construction",
-    "level": 45
+    "level": 45,
+    "experience": 55
    }
   ],
   "materials": [
@@ -129,7 +133,8 @@
    },
    {
     "name": "Construction",
-    "level": 60
+    "level": 60,
+    "experience": 85
    }
   ],
   "materials": [
@@ -159,7 +164,8 @@
    },
    {
     "name": "Construction",
-    "level": 77
+    "level": 77,
+    "experience": 152
    }
   ],
   "materials": [
@@ -189,7 +195,8 @@
    },
    {
     "name": "Construction",
-    "level": 85
+    "level": 85,
+    "experience": 175
    }
   ],
   "materials": [
@@ -219,7 +226,8 @@
    },
    {
     "name": "Construction",
-    "level": 1
+    "level": 1,
+    "experience": 24
    }
   ],
   "materials": [
@@ -249,7 +257,8 @@
    },
    {
     "name": "Construction",
-    "level": 11
+    "level": 11,
+    "experience": 36
    }
   ],
   "materials": [
@@ -279,7 +288,8 @@
    },
    {
     "name": "Construction",
-    "level": 26
+    "level": 26,
+    "experience": 49
    }
   ],
   "materials": [
@@ -309,7 +319,8 @@
    },
    {
     "name": "Construction",
-    "level": 45
+    "level": 45,
+    "experience": 70
    }
   ],
   "materials": [
@@ -339,7 +350,8 @@
    },
    {
     "name": "Construction",
-    "level": 60
+    "level": 60,
+    "experience": 110
    }
   ],
   "materials": [
@@ -369,7 +381,8 @@
    },
    {
     "name": "Construction",
-    "level": 77
+    "level": 77,
+    "experience": 197
    }
   ],
   "materials": [
@@ -399,7 +412,8 @@
    },
    {
     "name": "Construction",
-    "level": 85
+    "level": 85,
+    "experience": 231
    }
   ],
   "materials": [
@@ -429,7 +443,8 @@
    },
    {
     "name": "Construction",
-    "level": 1
+    "level": 1,
+    "experience": 31
    }
   ],
   "materials": [
@@ -459,7 +474,8 @@
    },
    {
     "name": "Construction",
-    "level": 11
+    "level": 11,
+    "experience": 46
    }
   ],
   "materials": [
@@ -489,7 +505,8 @@
    },
    {
     "name": "Construction",
-    "level": 26
+    "level": 26,
+    "experience": 65
    }
   ],
   "materials": [
@@ -519,7 +536,8 @@
    },
    {
     "name": "Construction",
-    "level": 45
+    "level": 45,
+    "experience": 90
    }
   ],
   "materials": [
@@ -549,7 +567,8 @@
    },
    {
     "name": "Construction",
-    "level": 60
+    "level": 60,
+    "experience": 139
    }
   ],
   "materials": [
@@ -579,7 +598,8 @@
    },
    {
     "name": "Construction",
-    "level": 77
+    "level": 77,
+    "experience": 250
    }
   ],
   "materials": [
@@ -609,7 +629,8 @@
    },
    {
     "name": "Construction",
-    "level": 85
+    "level": 85,
+    "experience": 291
    }
   ],
   "materials": [
@@ -639,7 +660,8 @@
    },
    {
     "name": "Construction",
-    "level": 1
+    "level": 1,
+    "experience": 19
    }
   ],
   "materials": [
@@ -669,7 +691,8 @@
    },
    {
     "name": "Construction",
-    "level": 1
+    "level": 1,
+    "experience": 128
    }
   ],
   "materials": [
@@ -699,7 +722,8 @@
    },
    {
     "name": "Construction",
-    "level": 1
+    "level": 1,
+    "experience": 199
    }
   ],
   "materials": [
@@ -729,7 +753,8 @@
    },
    {
     "name": "Construction",
-    "level": 8
+    "level": 8,
+    "experience": 27
    }
   ],
   "materials": [
@@ -759,7 +784,8 @@
    },
    {
     "name": "Construction",
-    "level": 8
+    "level": 8,
+    "experience": 238
    }
   ],
   "materials": [
@@ -789,7 +815,8 @@
    },
    {
     "name": "Construction",
-    "level": 8
+    "level": 8,
+    "experience": 373
    }
   ],
   "materials": [
@@ -819,7 +846,8 @@
    },
    {
     "name": "Construction",
-    "level": 23
+    "level": 23,
+    "experience": 41
    }
   ],
   "materials": [
@@ -853,7 +881,8 @@
    },
    {
     "name": "Construction",
-    "level": 23
+    "level": 23,
+    "experience": 345
    }
   ],
   "materials": [
@@ -887,7 +916,8 @@
    },
    {
     "name": "Construction",
-    "level": 23
+    "level": 23,
+    "experience": 538
    }
   ],
   "materials": [
@@ -921,7 +951,8 @@
    },
    {
     "name": "Construction",
-    "level": 41
+    "level": 41,
+    "experience": 46
    }
   ],
   "materials": [
@@ -955,7 +986,8 @@
    },
    {
     "name": "Construction",
-    "level": 41
+    "level": 41,
+    "experience": 588
    }
   ],
   "materials": [
@@ -989,7 +1021,8 @@
    },
    {
     "name": "Construction",
-    "level": 41
+    "level": 41,
+    "experience": 919
    }
   ],
   "materials": [
@@ -1023,7 +1056,8 @@
    },
    {
     "name": "Construction",
-    "level": 59
+    "level": 59,
+    "experience": 70
    }
   ],
   "materials": [
@@ -1057,7 +1091,8 @@
    },
    {
     "name": "Construction",
-    "level": 59
+    "level": 59,
+    "experience": 881
    }
   ],
   "materials": [
@@ -1091,7 +1126,8 @@
    },
    {
     "name": "Construction",
-    "level": 59
+    "level": 59,
+    "experience": 1380
    }
   ],
   "materials": [
@@ -1125,7 +1161,8 @@
    },
    {
     "name": "Construction",
-    "level": 75
+    "level": 75,
+    "experience": 84
    }
   ],
   "materials": [
@@ -1159,7 +1196,8 @@
    },
    {
     "name": "Construction",
-    "level": 75
+    "level": 75,
+    "experience": 1771
    }
   ],
   "materials": [
@@ -1193,7 +1231,8 @@
    },
    {
     "name": "Construction",
-    "level": 75
+    "level": 75,
+    "experience": 2779
    }
   ],
   "materials": [
@@ -1227,7 +1266,8 @@
    },
    {
     "name": "Construction",
-    "level": 84
+    "level": 84,
+    "experience": 93
    }
   ],
   "materials": [
@@ -1261,7 +1301,8 @@
    },
    {
     "name": "Construction",
-    "level": 84
+    "level": 84,
+    "experience": 2839
    }
   ],
   "materials": [
@@ -1295,7 +1336,8 @@
    },
    {
     "name": "Construction",
-    "level": 84
+    "level": 84,
+    "experience": 4474
    }
   ],
   "materials": [
