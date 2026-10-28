@@ -864,7 +864,9 @@ class RecipeTab extends JPanel
 			Kit.Card group = new Kit.Card(null);
 			group.setLayout(new BoxLayout(group, BoxLayout.Y_AXIS));
 			group.setBorder(new EmptyBorder(1, 2, 1, 2));
+			planGroupLevel(root.name);
 			addNodeRows(group, root, "", stock, opt, new boolean[0], 0);
+			groupSkill = null;
 			body.add(stretch(group));
 			body.add(Box.createVerticalStrut(5));
 		}
@@ -1002,6 +1004,46 @@ class RecipeTab extends JPanel
 		}
 	}
 
+	/** Skill and level the materials group being drawn is made at, when a level-goal step starts above your real level. */
+	private String groupSkill;
+	private int groupLevel;
+
+	/**
+	 * A top-level material is made during the earliest level-goal step that uses it, so its crafting steps
+	 * can count that step's starting level. Any count-mode recipe using it keeps your real level.
+	 */
+	private void planGroupLevel(String materialName)
+	{
+		groupSkill = null;
+		groupLevel = 0;
+		String key = Planner.normalize(materialName);
+		for (Selection s : selections)
+		{
+			boolean uses = false;
+			for (Recipe.Material m : s.recipe.materials)
+			{
+				if (m.name != null && Planner.normalize(m.name).equals(key))
+				{
+					uses = true;
+					break;
+				}
+			}
+			if (!uses)
+			{
+				continue;
+			}
+			Recipe.SkillReq skill = s.recipe.xpSkill();
+			if (s.targetLevel <= 0 || skill == null || (groupSkill != null && !groupSkill.equalsIgnoreCase(skill.name)))
+			{
+				groupSkill = null;
+				return;
+			}
+			int from = startLevel(s);
+			groupLevel = groupSkill == null ? from : Math.min(groupLevel, from);
+			groupSkill = skill.name;
+		}
+	}
+
 	private MaterialRow nodeRow(Planner.Node n, String path, Map<String, Counts> stock, Planner.Options opt,
 		boolean[] rails, int depth)
 	{
@@ -1037,7 +1079,7 @@ class RecipeTab extends JPanel
 
 		if (n.via != null)
 		{
-			List<String> blocked = blockers(n.via);
+			List<String> blocked = groupSkill == null ? blockers(n.via) : blockers(n.via, groupSkill, groupLevel);
 			if (!blocked.isEmpty())
 			{
 				row.detail("Needs " + String.join(", ", blocked), Theme.BAD, 2);
