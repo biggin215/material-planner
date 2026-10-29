@@ -45,10 +45,10 @@ public class RecipeRepository
 	private static final int PAGE_SIZE = 500;
 	private static final int MAX_ROWS = 40_000;
 	// v2: adds XP, cleaned tools/facilities, quest text and the real members flag
-	private static final String CACHE_NAME = "recipes-v2.json";
-	private static final String SHOP_CACHE_NAME = "shops-v2.json";
+	private static final String CACHE_NAME = "recipes-v3.json";
+	private static final String SHOP_CACHE_NAME = "shops-v3.json";
 	/** Cache files written by earlier versions of the plugin. */
-	private static final String[] OLD_CACHE_NAMES = {"recipes.json", "shops-v1.json"};
+	private static final String[] OLD_CACHE_NAMES = {"recipes.json", "recipes-v2.json", "shops-v1.json", "shops-v2.json"};
 	private static final int MAX_SHOP_ROWS = 60_000;
 	private static final Type SHOP_LIST_TYPE = new TypeToken<List<ShopSource>>()
 	{

@@ -294,7 +294,8 @@ public class PlannerTest
 		assertEquals(false, WikiRecipeParser.parseMembers(new com.google.gson.JsonPrimitive(false)));
 		assertEquals(false, WikiRecipeParser.parseMembers(new com.google.gson.JsonPrimitive("No")));
 		assertEquals(true, WikiRecipeParser.parseMembers(new com.google.gson.JsonPrimitive(true)));
-		assertEquals(true, WikiRecipeParser.parseMembers(null));
+		assertEquals(false, WikiRecipeParser.parseMembers(null));
+		assertEquals(true, WikiRecipeParser.parseMembers(new com.google.gson.JsonPrimitive("")));
 	}
 
 	@Test

@@ -115,13 +115,17 @@ final class WikiRecipeParser
 		return r;
 	}
 
+	/**
+	 * The wiki API sends a true yes/no field as an empty string and leaves a false one out; older or
+	 * hand-written values may be "Yes"/"No", true/false or 1/0.
+	 */
 	static boolean parseMembers(JsonElement e)
 	{
 		String s = str(e);
 		if (s == null)
 		{
-			// Unknown: assume members so free-to-play players aren't promised something they can't do
-			return true;
+			// The wiki API leaves false yes/no fields out of the response entirely
+			return false;
 		}
 		s = s.trim().toLowerCase();
 		return !(s.equals("no") || s.equals("false") || s.equals("0") || s.equals("f2p"));
