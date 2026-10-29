@@ -463,6 +463,7 @@ public class RecipeRepository
 				ShopSource s = new ShopSource();
 				s.item = WikiText.clean(text(ro.get("sold_item")));
 				s.store = WikiText.clean(text(ro.get("sold_by")));
+				s.page = WikiText.linkTarget(text(ro.get("sold_by")));
 				s.currency = WikiText.clean(text(ro.get("store_currency")));
 				s.stock = WikiText.clean(text(ro.get("store_stock")));
 				s.price = WikiRecipeParser.num(ro.get("store_sell_price"), -1);
@@ -514,7 +515,7 @@ public class RecipeRepository
 				}
 				info.putIfAbsent(Planner.normalize(page), new String[]{
 					WikiText.clean(text(ro.get("location"))),
-					WikiText.clean(text(ro.get("owner"))),
+					WikiText.linkTarget(text(ro.get("owner"))),
 					String.valueOf(WikiRecipeParser.parseMembers(ro.get("is_members_only")))});
 			}
 			if (rows.size() < PAGE_SIZE)
@@ -527,8 +528,8 @@ public class RecipeRepository
 		Set<String> names = new java.util.TreeSet<>();
 		for (ShopSource s : shops)
 		{
-			names.add(s.store);
-			String[] i = info.get(Planner.normalize(s.store));
+			names.add(s.pageName());
+			String[] i = info.get(Planner.normalize(s.pageName()));
 			if (i != null && i[1] != null && !i[1].isEmpty())
 			{
 				names.add(i[1]);
@@ -552,13 +553,13 @@ public class RecipeRepository
 
 		for (ShopSource s : shops)
 		{
-			String[] i = info.get(Planner.normalize(s.store));
+			String[] i = info.get(Planner.normalize(s.pageName()));
 			if (i != null)
 			{
 				s.location = i[0];
 				s.members = Boolean.parseBoolean(i[2]);
 			}
-			List<int[]> c = spots.get(Planner.normalize(s.store));
+			List<int[]> c = spots.get(Planner.normalize(s.pageName()));
 			if ((c == null || c.isEmpty()) && i != null && i[1] != null)
 			{
 				c = spots.get(Planner.normalize(i[1]));

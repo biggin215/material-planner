@@ -139,12 +139,23 @@ public final class ShopAccess
 	 */
 	public static int distance(ShopSource s, int[] player)
 	{
-		if (player == null || s.coords == null || s.coords.isEmpty())
+		if (player == null)
 		{
 			return -1;
 		}
+		List<int[]> spots = s.coords;
+		if (spots == null || spots.isEmpty())
+		{
+			// Most single-spawn shopkeepers have no map spots on the wiki; use the town instead
+			int[] town = ShopPlaces.find(s.location, s.store);
+			if (town == null)
+			{
+				return -1;
+			}
+			spots = java.util.Collections.singletonList(town);
+		}
 		int best = -1;
-		for (int[] c : s.coords)
+		for (int[] c : spots)
 		{
 			if (c == null || c.length < 2)
 			{

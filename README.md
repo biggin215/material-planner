@@ -84,5 +84,5 @@ Requires JDK 11+.
 - When the wiki lists three same-named Sailing recipes, they're labelled Raft/Skiff/Sloop by material count. That's inferred, not read from the data.
 - XP per action and quest requirements come from the wiki's recipe data. Recipes without XP data can only be planned by count, and quest names that don't match RuneLite's quest list aren't checked.
 - Shop prices are base prices; most shops charge more as their stock runs down.
-- "Nearest" is straight-line distance on the map, not walking or teleport time. Which areas need which quest is a hand-kept list, so a gated area that isn't on it is treated as open.
+- "Nearest" is straight-line distance on the map, not walking or teleport time. Shopkeepers without map spots on the wiki are placed at the centre of their town, so it's approximate. Which areas need which quest is a hand-kept list, so a gated area that isn't on it is treated as open.
 - POH costume room storage isn't tracked.

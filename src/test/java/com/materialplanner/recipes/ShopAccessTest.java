@@ -134,4 +134,28 @@ public class ShopAccessTest
 	{
 		assertEquals("Aubury\\'s Rune Shop", WikiText.lua("Aubury's Rune Shop"));
 	}
+
+	@Test
+	public void shopsWithoutMapSpotsUseTheirTown()
+	{
+		ShopSource s = shop("Varrock Swordshop", "Varrock", 10, false, 0, 0);
+		s.coords = null;
+		assertEquals(5, ShopAccess.distance(s, new int[]{3212, 3429, 0}));
+		ShopSource east = shop("Some stall", "East Ardougne market", 10, true, 0, 0);
+		east.coords = null;
+		assertEquals(0, ShopAccess.distance(east, new int[]{2662, 3305, 0}));
+		ShopSource nowhere = shop("Mystery shop", "Somewhere new", 10, true, 0, 0);
+		nowhere.coords = null;
+		assertEquals(-1, ShopAccess.distance(nowhere, new int[]{3212, 3429, 0}));
+	}
+
+	@Test
+	public void linkTargetsUseThePageNotTheLabel()
+	{
+		assertEquals("Shop keeper (Varrock Swordshop)", WikiText.linkTarget("[[Shop keeper (Varrock Swordshop)|Shop keeper]]"));
+		assertEquals("Bob", WikiText.linkTarget("[[Bob]]"));
+		assertEquals("Lumbridge", WikiText.linkTarget("[[File:Lumbridge.png]] [[Lumbridge]]"));
+		assertEquals("Zaff", WikiText.linkTarget("Zaff"));
+		assertEquals("Dwarven Mines", WikiText.clean("[[Dwarven Mine]]s"));
+	}
 }

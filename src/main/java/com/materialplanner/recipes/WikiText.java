@@ -130,4 +130,28 @@ public final class WikiText
 	{
 		return s.replace("\\", "\\\\").replace("'", "\\'");
 	}
+
+	private static final java.util.regex.Pattern FIRST_LINK = java.util.regex.Pattern.compile("\\[\\[([^\\]|]+)(?:\\|[^\\]]*)?]]");
+
+	/**
+	 * The page a piece of wikitext links to: "[[Shop keeper (Varrock Swordshop)|Shop keeper]]" gives
+	 * "Shop keeper (Varrock Swordshop)". Text without a link is just cleaned.
+	 */
+	public static String linkTarget(String s)
+	{
+		if (s == null)
+		{
+			return null;
+		}
+		java.util.regex.Matcher m = FIRST_LINK.matcher(s);
+		while (m.find())
+		{
+			String target = m.group(1).trim();
+			if (!target.regionMatches(true, 0, "File:", 0, 5))
+			{
+				return target;
+			}
+		}
+		return clean(s);
+	}
 }
