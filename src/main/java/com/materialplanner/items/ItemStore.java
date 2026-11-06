@@ -237,7 +237,35 @@ public class ItemStore
 			configManager.setRSProfileConfiguration(GROUP, itemsKey(location), gson.toJson(new ArrayList<>(map.values())));
 			configManager.setRSProfileConfiguration(GROUP, timeKey(location), String.valueOf(now));
 		}
+		if (location == Location.BANK)
+		{
+			saveCarriedCopy(now);
+		}
 		fire();
+	}
+
+	/**
+	 * Saves what's worn and in the inventory at the moment the bank is opened, so tools outside the
+	 * client (such as a planner reading the profile file) know what the player had on them. Only
+	 * written on bank opens, not on every inventory change, and never loaded back as storage.
+	 */
+	private void saveCarriedCopy(long now)
+	{
+		for (Location loc : new Location[]{Location.WORN, Location.INVENTORY})
+		{
+			List<StoredItem> list;
+			synchronized (this)
+			{
+				Map<Integer, StoredItem> m = items.get(loc);
+				list = m == null ? null : new ArrayList<>(m.values());
+			}
+			if (list == null)
+			{
+				continue;
+			}
+			configManager.setRSProfileConfiguration(GROUP, itemsKey(loc), gson.toJson(list));
+			configManager.setRSProfileConfiguration(GROUP, timeKey(loc), String.valueOf(now));
+		}
 	}
 
 	/**
